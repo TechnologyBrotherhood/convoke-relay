@@ -1,0 +1,7 @@
+node_modules/
+web/dist/
+/relay
+*.log
+.DS_Store
+/convoke-relay
+.claude/worktrees/

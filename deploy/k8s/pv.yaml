@@ -1,0 +1,33 @@
+# Host id claims (hashes only) live here so a restart can't free a claimed id.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: convoke-relay-hostpath
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: convoke-relay-data
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: convoke-relay-hostpath
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /mnt/data/convoke-relay
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: convoke-relay-data
+  namespace: convoke-relay
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: convoke-relay-hostpath
+  resources:
+    requests:
+      storage: 1Gi

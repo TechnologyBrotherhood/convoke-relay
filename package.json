@@ -1,0 +1,16 @@
+{
+  "name": "convoke-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Convoke relay: routes end-to-end encrypted traffic between a Convoke host (the Mac) and its paired devices. Also the remote protocol, in TypeScript.",
+  "scripts": {
+    "test": "node --test --test-timeout=30000 test/*.test.ts",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.9.3"
+  },
+  "license": "Apache-2.0"
+}

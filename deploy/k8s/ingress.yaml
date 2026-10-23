@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: convoke-relay
+  namespace: convoke-relay
+spec:
+  ingressClassName: traefik
+  rules:
+    # Public: Cloudflare tunnel (tb-0-3's own) → traefik. Route added in the CF dashboard.
+    - host: relay.cnvk.si
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: convoke-relay, port: { number: 80 } } }
+    # Tailnet: the reserved .internal TLD (no inherited HSTS), via headscale extra_records.
+    - host: convoke-relay.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: convoke-relay, port: { number: 80 } } }

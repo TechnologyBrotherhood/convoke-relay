@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: convoke-relay
+  namespace: convoke-relay
+  labels:
+    app.kubernetes.io/name: convoke-relay
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: convoke-relay
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: convoke-relay
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
+      imagePullSecrets:
+        - name: registry-cred
+      initContainers:
+        - name: chown-data
+          image: busybox:1.36
+          command: ["sh", "-c", "chown -R 65532:65532 /data && chmod 0770 /data"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+      containers:
+        - name: relay
+          # bin/deploy substitutes the commit's tag (git-<sha>) for :latest.
+          image: 100.64.0.5:30500/convoke-relay:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            # Public requests arrive via the Cloudflare tunnel (cloudflared, in-cluster) →
+            # traefik; CF-Connecting-IP is honoured only when traefik saw an in-cluster hop.
+            - name: RELAY_TRUST_CF_HEADER
+              value: "1"
+            # Tailnet/LAN clients also reach traefik from a pod address (svclb masquerades
+            # them), so they could still forge CF-Connecting-IP. Closing that needs a
+            # Cloudflare transform rule adding X-Relay-Edge: <secret>. Add the rule first,
+            # then the secret: the other way round, every public client shares one address.
+            - name: RELAY_CF_EDGE_SECRET
+              valueFrom:
+                secretKeyRef: { name: cf-edge, key: secret, optional: true }
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { cpu: "1", memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: convoke-relay-data

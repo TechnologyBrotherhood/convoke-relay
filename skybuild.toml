@@ -1,0 +1,13 @@
+name = "convoke-relay"
+
+# Pushed to BOTH registries: tb-0-3 (the relay's home, what the manifests reference)
+# and tb-0-0 (nothing syncs registries; a copy there allows failover).
+[[artifact]]
+type = "docker"
+tags = ["latest", "git-{short_sha}"]
+push = ["100.64.0.5:30500/convoke-relay", "100.64.0.10:30500/convoke-relay"]
+
+# Don't ship a relay whose tests fail (runs in the Go build stage).
+[artifact.test]
+stage = "build"
+run = "go test ./..."

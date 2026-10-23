@@ -1,0 +1,6 @@
+:root { color-scheme: dark; --bg: #15161a; --text: #e8e8ea; --muted: #9a9ba3; --accent: #7aa2f7; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 -apple-system, system-ui, sans-serif; }
+main { max-width: 480px; margin: 0 auto; padding: 48px 20px; }
+h1 { font-size: 24px; margin: 0 0 16px; }
+.note { color: var(--muted); font-size: 14px; }
+.button { display: inline-block; padding: 12px 18px; border-radius: 10px; background: var(--accent); color: #0d1020; font-weight: 600; text-decoration: none; }

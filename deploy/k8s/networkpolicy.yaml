@@ -1,0 +1,22 @@
+# The relay only accepts connections (from traefik, and the deploy's health check in
+# this namespace) and never makes any: deny everything else, both ways.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: convoke-relay
+  namespace: convoke-relay
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: convoke-relay
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: traefik }
+        - podSelector: {} # same namespace (the deploy health check)
+      ports:
+        - port: 8080
+  egress: []

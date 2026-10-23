@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# convoke-relay deploy: skybuild builds + tests + pushes the image; this makes it live
+# on tb-0-3. Usage: bin/deploy [--no-build]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+KUBE_CONTEXT=${KUBE_CONTEXT:-tb-0-3}
+REGISTRY=${REGISTRY:-100.64.0.5:30500}
+NS=convoke-relay
+REGISTRY_CREDS_FILE=${REGISTRY_CREDS_FILE:-$HOME/code/skybright.dev/sb-on-prem/tb-0-0/secrets/registry-creds.json}
+
+k() { kubectl --context "$KUBE_CONTEXT" "$@"; }
+
+no_build=false
+for arg in "${@:-}"; do
+  case "$arg" in
+    --no-build) no_build=true ;;
+    "") ;;
+    *) echo "unknown flag: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# Deploy exactly the image built from this commit (skybuild tags git-<12-char sha>),
+# never whatever :latest happens to be.
+if [ -n "$(git status --porcelain)" ]; then
+  echo "uncommitted changes: commit first, so the deployed image matches a commit" >&2
+  exit 1
+fi
+TAG="git-$(git rev-parse --short=12 HEAD)"
+
+if ! $no_build; then
+  skybuild build
+fi
+
+k apply -f deploy/k8s/namespace.yaml >/dev/null
+
+REGISTRY_USERNAME=$(jq -r .username "$REGISTRY_CREDS_FILE")
+REGISTRY_PASSWORD=$(jq -r .password "$REGISTRY_CREDS_FILE")
+k -n "$NS" create secret docker-registry registry-cred \
+  --docker-server="$REGISTRY" \
+  --docker-username="$REGISTRY_USERNAME" \
+  --docker-password="$REGISTRY_PASSWORD" \
+  --dry-run=client -o yaml | k apply -f - >/dev/null
+
+for f in deploy/k8s/*.yaml; do
+  sed "s#/convoke-relay:latest#/convoke-relay:$TAG#" "$f"
+  echo "---"
+done | k apply -f - >/dev/null
+echo "manifests applied (image $TAG)"
+k -n "$NS" rollout status deployment/convoke-relay --timeout=120s
+
+# Health from inside the cluster's network path (public name may not be routed yet).
+k -n "$NS" run "health-$(date +%s)" --rm -i --restart=Never --image=busybox:1.36 --quiet -- \
+  wget -qO- http://convoke-relay.convoke-relay.svc.cluster.local/health
+echo "convoke-relay is live (public: https://relay.cnvk.si once the Cloudflare route exists)"

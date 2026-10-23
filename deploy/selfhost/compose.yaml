@@ -1,0 +1,41 @@
+# Self-hosted Convoke relay: the relay plus Caddy, which gets a Let's Encrypt certificate
+# for your domain and terminates TLS (both Convoke apps only talk to https relays).
+#
+#   1. Point a DNS A/AAAA record for your relay's domain at this machine; open ports 80 and 443.
+#   2. RELAY_DOMAIN=relay.example.com docker compose up -d --build
+#   3. In Convoke on the Mac: remote-relay = https://relay.example.com
+#
+# Built from this checkout, so you run exactly the code you can read.
+services:
+  relay:
+    build: ../..
+    restart: unless-stopped
+    environment:
+      # Caddy reaches the relay over this compose network (a private address), so its
+      # X-Forwarded-For is trusted for rate limiting. Don't publish the relay's port.
+      RELAY_TRUSTED_PROXIES: private
+    volumes:
+      - relay-data:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    depends_on: [relay]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN:?set RELAY_DOMAIN to your relay's domain, e.g. relay.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  relay-data:
+  caddy-data:
+  caddy-config:

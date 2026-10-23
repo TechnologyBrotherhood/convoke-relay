@@ -1,0 +1,5 @@
+# Caddy gets and renews the certificate itself. reverse_proxy handles websockets and
+# appends the client address to X-Forwarded-For, which the relay trusts from a private peer.
+{$RELAY_DOMAIN} {
+	reverse_proxy relay:8080
+}
