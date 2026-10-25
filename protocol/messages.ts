@@ -129,6 +129,8 @@ export type HostMessage =
    */
   | { t: 'blocks'; pane: number; items: ShellBlock[]; reset?: boolean }
   | { t: 'approvals'; items: Approval[] }
+  /** An `upload` arrived whole and was saved (or why not): `text` can now name it in `files`. */
+  | { t: 'uploaded'; id: string; error?: string }
   | { t: 'error'; message: string }
   | { t: 'pong' }
 
@@ -148,14 +150,32 @@ export interface ShellBlock {
   truncated?: boolean
 }
 
+/**
+ * Raw bytes per `upload` chunk: base64 in the message, then sealed and base64 again,
+ * comes to about 1.8x, well under the relay's 1 MiB client frame.
+ */
+export const UPLOAD_CHUNK_BYTES = 384 * 1024
+/** The largest upload a Mac accepts. */
+export const UPLOAD_MAX_BYTES = 32 * 1024 * 1024
+
 /** Keys the remote keyboard row can send. */
 export const REMOTE_KEYS = ['enter', 'escape', 'tab', 'backspace', 'up', 'down', 'left', 'right', 'ctrl-c', 'ctrl-d', 'shift-tab'] as const
 export type RemoteKey = (typeof REMOTE_KEYS)[number]
 
 export type ClientMessage =
   | { t: 'subscribe'; pane: number | null }
-  /** `typed`: key by key, as at the keyboard (not a paste): agents only run slash commands typed. */
-  | { t: 'text'; pane: number; text: string; submit?: boolean; typed?: boolean }
+  /**
+   * `typed`: key by key, as at the keyboard (not a paste): agents only run slash commands typed.
+   * `files`: ids of finished uploads, dropped on the terminal before the text, as if
+   * dragged there from Finder (agents attach images dropped that way).
+   */
+  | { t: 'text'; pane: number; text: string; submit?: boolean; typed?: boolean; files?: string[] }
+  /**
+   * A file (a photo, a document) for an agent, in chunks that each fit a relay frame:
+   * `data` is base64 of bytes `seq * UPLOAD_CHUNK_BYTES` onwards. `size` is the whole
+   * file's. The Mac answers the last chunk with `uploaded`.
+   */
+  | { t: 'upload'; id: string; name: string; size: number; seq: number; data: string; last?: boolean }
   | { t: 'key'; pane: number; key: RemoteKey }
   | { t: 'decide'; id: string; allow: boolean }
   | { t: 'ping' }

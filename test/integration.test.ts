@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { b64u, generateKeyPair, hostIdFor, sessionClientStart, unb64u } from '../protocol/crypto.ts'
 import { pairWithHost, RelayClient, RelayHost, type PairedClient } from '../protocol/session.ts'
-import type { ClientMessage, HostMessage } from '../protocol/messages.ts'
+import { UPLOAD_CHUNK_BYTES, type ClientMessage, type HostMessage } from '../protocol/messages.ts'
 
 // RELAY_URL tests an already-running relay (e.g. the deployment, via port-forward);
 // otherwise a fresh one is built and started.
@@ -83,6 +83,11 @@ test('pair, then talk end to end through the relay', async () => {
   await phone.send({ t: 'text', pane: 7, text: 'npm test', submit: true })
   const r = await until(() => received[0])
   assert.deepEqual(r, { client: 'Test iPhone', msg: { t: 'text', pane: 7, text: 'npm test', submit: true } })
+  // A full upload chunk (incompressible bytes) still fits a client frame.
+  const chunk = Buffer.from(Array.from({ length: UPLOAD_CHUNK_BYTES }, () => Math.floor(Math.random() * 256))).toString('base64')
+  await phone.send({ t: 'upload', id: 'up1', name: 'photo.jpg', size: UPLOAD_CHUNK_BYTES, seq: 0, data: chunk, last: true })
+  const up = await until(() => received[1])
+  assert.equal(up.msg.t === 'upload' && up.msg.data, chunk)
   await host.send('all', { t: 'pong' })
   assert.deepEqual(await until(() => got[0]), { t: 'pong' })
   // The relay only ever logs routing, never content.

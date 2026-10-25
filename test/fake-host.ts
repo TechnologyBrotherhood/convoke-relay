@@ -13,6 +13,7 @@ import { spawn, execFileSync, type ChildProcess } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { generateKeyPair, hostIdFor } from '../protocol/crypto.ts'
 import { pairingLink, type ChatItem, type HostMessage } from '../protocol/messages.ts'
@@ -42,6 +43,10 @@ const CLAUDE = 11
 const SHELL = 12
 const WEB = 13
 let nextId = 100
+/** Uploads being received, by id; then what arrived whole (name, size). */
+const uploads = new Map<string, Buffer[]>()
+const uploaded = new Map<string, { name: string; size: number }>()
+const IMAGE = /\.(png|jpe?g|gif|webp|heic)$/i
 
 const state: HostMessage = {
   t: 'state',
@@ -147,9 +152,27 @@ async function main(): Promise<void> {
         }
         void host.send('all', st).then(() => host.send(conn, { t: 'result', rid: msg.rid, ...result } as HostMessage))
       }
-      // A prompt typed into the agent shows up in its transcript a moment later, as with a real agent.
-      if (msg.t === 'text' && msg.submit && msg.pane === CLAUDE)
-        setTimeout(() => void host.send('all', { t: 'chat', pane: CLAUDE, items: [{ id: `u-${Date.now()}`, k: 'user', text: msg.text }] }), 6000)
+      // A file in chunks: reported whole (with its hash, to check against what was sent).
+      if (msg.t === 'upload') {
+        const parts = uploads.get(msg.id) ?? []
+        parts[msg.seq] = Buffer.from(msg.data, 'base64')
+        uploads.set(msg.id, parts)
+        if (msg.last) {
+          const data = Buffer.concat(parts)
+          uploads.delete(msg.id)
+          const ok = data.length === msg.size
+          if (ok) uploaded.set(msg.id, { name: msg.name, size: data.length })
+          out({ event: 'uploaded', id: msg.id, name: msg.name, size: data.length, sha256: createHash('sha256').update(data).digest('hex') })
+          void host.send(conn, { t: 'uploaded', id: msg.id, ...(!ok && { error: 'size mismatch' }) })
+        }
+      }
+      // A prompt typed into the agent shows up in its transcript a moment later, as with a
+      // real agent: images dropped with it as Claude records them ("[Image #1] text").
+      if (msg.t === 'text' && msg.submit && msg.pane === CLAUDE) {
+        const images = (msg.files ?? []).filter((id) => IMAGE.test(uploaded.get(id)?.name ?? '')).length
+        const text = [...Array.from({ length: images }, (_, i) => `[Image #${i + 1}]`), msg.text].filter(Boolean).join(' ')
+        setTimeout(() => void host.send('all', { t: 'chat', pane: CLAUDE, items: [{ id: `u-${Date.now()}`, k: 'user', text, ...(images && { images }) }] }), 6000)
+      }
     },
     onStatus: (s, detail) => out({ event: 'status', status: s, detail })
   })
