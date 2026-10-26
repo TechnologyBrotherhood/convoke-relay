@@ -109,6 +109,12 @@ export type HostMessage =
       pane: number
       items: ChatItem[]
       reset?: boolean
+      /**
+       * More of this message follows: a long conversation sent from the start comes in
+       * parts that each fit a relay frame. Devices show it once whole (the last part has
+       * no `more`), not the first part alone.
+       */
+      more?: boolean
       title?: string
       mode?: string
       working?: boolean
