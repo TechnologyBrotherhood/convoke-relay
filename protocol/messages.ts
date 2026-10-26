@@ -30,7 +30,12 @@ export interface RemoteTab {
   id: number
   panes: RemotePane[]
   focused: number
+  /** How the tab's panes are split (absent: one pane). */
+  layout?: RemoteLayout
 }
+
+/** A tab's splits: a pane, or two halves side by side (`row`) or stacked (`column`). */
+export type RemoteLayout = { pane: number } | { dir: 'row' | 'column'; ratio: number; a: RemoteLayout; b: RemoteLayout }
 
 export interface RemoteStream {
   id: string
@@ -200,6 +205,8 @@ export type ClientMessage =
       | { op: 'new-stream'; name: string }
       | { op: 'new-tab'; stream: string; url?: string; run?: string; cwd?: string; title?: string }
       | { op: 'close-tab'; tab: number }
+      /** One split; its tab closes with it only if it was the tab's last. */
+      | { op: 'close-pane'; pane: number }
     ))
 
 /** What a pairing QR / link carries. */
