@@ -11,3 +11,12 @@ push = ["100.64.0.5:30500/convoke-relay", "100.64.0.10:30500/convoke-relay"]
 [artifact.test]
 stage = "build"
 run = "go test ./..."
+
+# Convoke's push service (cmd/convoke-push; not part of a self-hosted relay). Deployed by
+# bin/deploy-push.
+[[artifact]]
+type = "docker"
+name = "push"
+dockerfile = "Dockerfile.push"
+tags = ["latest", "git-{short_sha}"]
+push = ["100.64.0.5:30500/convoke-push", "100.64.0.10:30500/convoke-push"]

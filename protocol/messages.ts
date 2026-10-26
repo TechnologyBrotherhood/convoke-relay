@@ -186,6 +186,12 @@ export type ClientMessage =
   | { t: 'decide'; id: string; allow: boolean }
   | { t: 'ping' }
   /**
+   * How to wake this device when it isn't connected: its id at a Convoke push service
+   * (`service`, an https URL). The Mac posts only the id there, and the device shows a
+   * content-free alert. `id: null` stops it.
+   */
+  | { t: 'push'; id: string | null; service?: string }
+  /**
    * Change the Mac's layout (answered with a `result` carrying the same `rid`). Made in
    * the background: the Mac's own view doesn't switch. `run` is typed into a new
    * terminal's shell (e.g. "claude"); `url` makes a web tab.

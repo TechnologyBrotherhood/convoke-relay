@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Convoke push service deploy (cmd/convoke-push): skybuild builds + tests + pushes both
+# images; this makes the push service live on tb-0-3. Usage: bin/deploy-push [--no-build]
+#
+# The APNs key, once there is one (developer.apple.com → Keys → Apple Push Notifications):
+#   kubectl --context tb-0-3 -n convoke-push create secret generic apns \
+#     --from-file=key.p8=AuthKey_XXXXXXXXXX.p8 --from-literal=key-id=XXXXXXXXXX --from-literal=team-id=YYYYYYYYYY
+#   kubectl --context tb-0-3 -n convoke-push rollout restart deployment/convoke-push
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+KUBE_CONTEXT=${KUBE_CONTEXT:-tb-0-3}
+REGISTRY=${REGISTRY:-100.64.0.5:30500}
+NS=convoke-push
+REGISTRY_CREDS_FILE=${REGISTRY_CREDS_FILE:-$HOME/code/skybright.dev/sb-on-prem/tb-0-0/secrets/registry-creds.json}
+
+k() { kubectl --context "$KUBE_CONTEXT" "$@"; }
+
+no_build=false
+for arg in "${@:-}"; do
+  case "$arg" in
+    --no-build) no_build=true ;;
+    "") ;;
+    *) echo "unknown flag: $arg" >&2; exit 2 ;;
+  esac
+done
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "uncommitted changes: commit first, so the deployed image matches a commit" >&2
+  exit 1
+fi
+TAG="git-$(git rev-parse --short=12 HEAD)"
+
+if ! $no_build; then
+  skybuild build
+fi
+
+# The namespace first (the registry credential lives in it), then everything else.
+sed -n '1,/^---$/p' deploy/push/push.yaml | k apply -f - >/dev/null
+REGISTRY_USERNAME=$(jq -r .username "$REGISTRY_CREDS_FILE")
+REGISTRY_PASSWORD=$(jq -r .password "$REGISTRY_CREDS_FILE")
+k -n "$NS" create secret docker-registry registry-cred \
+  --docker-server="$REGISTRY" \
+  --docker-username="$REGISTRY_USERNAME" \
+  --docker-password="$REGISTRY_PASSWORD" \
+  --dry-run=client -o yaml | k apply -f - >/dev/null
+
+sed "s#/convoke-push:latest#/convoke-push:$TAG#" deploy/push/push.yaml | k apply -f - >/dev/null
+echo "manifests applied (image $TAG)"
+k -n "$NS" rollout status deployment/convoke-push --timeout=120s
+
+k -n "$NS" run "health-$(date +%s)" --rm -i --restart=Never --image=busybox:1.36 --quiet -- \
+  wget -qO- http://convoke-push.convoke-push.svc.cluster.local/health
+echo "convoke-push is live (public: https://push.cnvk.si once the Cloudflare route exists)"

@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1
+# Convoke's push service (cmd/convoke-push): a static Go binary. Its tests gate the build.
+FROM golang:1.25 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY push push
+COPY cmd/convoke-push cmd/convoke-push
+RUN go test ./push/ && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/convoke-push ./cmd/convoke-push
+RUN mkdir -p /out/data
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/convoke-push /convoke-push
+COPY --from=build --chown=65532:65532 /out/data /data
+USER 65532:65532
+ENV PUSH_DATA=/data
+EXPOSE 8080
+ENTRYPOINT ["/convoke-push"]
