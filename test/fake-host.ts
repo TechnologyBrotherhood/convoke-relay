@@ -62,7 +62,11 @@ const state: HostMessage = {
         { id: 3, focused: WEB, panes: [{ id: WEB, kind: 'web', title: 'Example Domain', url: 'https://example.com/' }] }
       ]
     },
-    { id: 'other', name: 'Other one', tabs: [] }
+    // A tab split in two (side by side): each split closes on its own.
+    { id: 'other', name: 'Other one', tabs: [{ id: 4, focused: 14, layout: { dir: 'row', ratio: 0.5, a: { pane: 14 }, b: { pane: 15 } }, panes: [
+      { id: 14, kind: 'terminal', title: 'npm run dev', cwd: '/Users/me/code/site' },
+      { id: 15, kind: 'terminal', title: 'tail -f server.log', cwd: '/Users/me/code/site' }
+    ] }] }
   ]
 }
 
@@ -148,6 +152,17 @@ async function main(): Promise<void> {
           } else result = { error: 'no such stream' }
         } else if (msg.op === 'close-tab') {
           for (const x of st.streams) x.tabs = x.tabs.filter((t) => t.id !== msg.tab)
+          result = {}
+        } else if (msg.op === 'close-pane') {
+          // One split: the tab keeps the rest (and goes with its last).
+          for (const x of st.streams) {
+            for (const t of x.tabs) t.panes = t.panes.filter((p) => p.id !== msg.pane)
+            x.tabs = x.tabs.filter((t) => t.panes.length > 0)
+            for (const t of x.tabs) if (t.panes.length === 1) {
+              delete t.layout
+              t.focused = t.panes[0].id
+            }
+          }
           result = {}
         }
         void host.send('all', st).then(() => host.send(conn, { t: 'result', rid: msg.rid, ...result } as HostMessage))
