@@ -156,6 +156,13 @@ export type HostMessage =
    */
   | { t: 'blocks'; pane: number; items: ShellBlock[]; reset?: boolean }
   | { t: 'approvals'; items: Approval[] }
+  /**
+   * This Mac now uses another relay (its `remote-relay` changed): connect there from now
+   * on, with the same pairing. Sent to live sessions as the Mac leaves, and for a while
+   * from the old relay to devices that come back to it. Devices check the URL
+   * (`safeRelay`) and ask before following: a relay sees who talks when, though no content.
+   */
+  | { t: 'relay-move'; relay: string }
   /** An `upload` arrived whole and was saved (or why not): `text` can now name it in `files`. */
   | { t: 'uploaded'; id: string; error?: string }
   | { t: 'error'; message: string }
