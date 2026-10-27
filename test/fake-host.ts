@@ -8,7 +8,8 @@
 //   {"event":"session","name":…}               a device connected
 //   {"event":"message","msg":{…}}              something a device sent
 // Content: two streams; a Claude tab with a chat and a pending approval, a shell tab
-// (with command blocks), and a web tab. Lines on stdin are JSON host messages to send to every device.
+// (with command blocks), and a web tab that Claude is driving (live frames when watched
+// `live`; each `web` action from the device brings a new frame). Lines on stdin are JSON host messages to send to every device.
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -17,6 +18,7 @@ import { createHash } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { generateKeyPair, hostIdFor } from '../protocol/crypto.ts'
 import { pairingLink, type ChatItem, type HostMessage } from '../protocol/messages.ts'
+import { FAKE_FRAME } from './fake-frame.ts'
 import { RelayHost, type PairedClient } from '../protocol/session.ts'
 
 const NAME = process.env.FAKE_HOST_NAME || 'Test Mac'
@@ -51,6 +53,7 @@ const IMAGE = /\.(png|jpe?g|gif|webp|heic)$/i
 const state: HostMessage = {
   t: 'state',
   host: NAME,
+  features: ['live-web'],
   active: { stream: 'convoke', tab: 1 },
   streams: [
     {
@@ -59,7 +62,7 @@ const state: HostMessage = {
       tabs: [
         { id: 1, focused: CLAUDE, panes: [{ id: CLAUDE, kind: 'terminal', title: 'Fix the relay cache', cwd: '/Users/me/code/convoke', agent: 'claude', attention: { kind: 'approval', text: 'Needs approval' } }] },
         { id: 2, focused: SHELL, panes: [{ id: SHELL, kind: 'terminal', title: 'zsh', cwd: '/Users/me/code/convoke' }] },
-        { id: 3, focused: WEB, panes: [{ id: WEB, kind: 'web', title: 'Example Domain', url: 'https://example.com/' }] }
+        { id: 3, focused: WEB, panes: [{ id: WEB, kind: 'web', title: 'Example Domain', url: 'https://example.com/', driving: 'Claude' }] }
       ]
     },
     // A tab split in two (side by side): each split closes on its own.
@@ -134,6 +137,9 @@ async function main(): Promise<void> {
       if (msg.t === 'text' && msg.pane === SHELL && msg.submit && msg.text)
         void host.send(conn, { t: 'blocks', pane: SHELL, items: [{ id: `b${nextId++}`, command: msg.text, startedAt: Date.now(), running: false, exit: 0, ms: 12, output: `ran: ${msg.text}` }] })
       if (msg.t === 'ping') void host.send(conn, { t: 'pong' })
+      // The web tab, as on the Mac: a frame on a live subscribe, and after each action.
+      if ((msg.t === 'subscribe' && msg.pane === WEB && msg.live) || (msg.t === 'web' && msg.pane === WEB))
+        void host.send(conn, { t: 'frame', pane: WEB, seq: nextId++, data: FAKE_FRAME, w: 640, h: 400 })
       // Layout from the device: change the state, broadcast it, answer with the ids.
       if (msg.t === 'layout') {
         const st = state as Extract<HostMessage, { t: 'state' }>

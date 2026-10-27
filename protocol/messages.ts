@@ -24,6 +24,8 @@ export interface RemotePane {
   agentSetup?: 'install' | 'restart'
   /** The agent `agentSetup` is about ("claude" when absent, "omp", "codex"). */
   setupAgent?: string
+  /** A web tab an agent is acting on right now, and which agent ("Claude", "Codex", …). */
+  driving?: string
 }
 
 export interface RemoteTab {
@@ -103,7 +105,15 @@ export interface LayoutResult {
 export type HostMessage =
   /** `role`: what this device may do ("view": watch only; absent = full control). */
   | LayoutResult
-  | { t: 'state'; host: string; streams: RemoteStream[]; active: { stream: string; tab: number | null }; role?: DeviceRole }
+  | {
+      t: 'state'
+      host: string
+      streams: RemoteStream[]
+      active: { stream: string; tab: number | null }
+      role?: DeviceRole
+      /** What this Mac can do beyond the base protocol: `live-web` (it sends `frame`s of web tabs). */
+      features?: string[]
+    }
   /**
    * An agent pane's conversation: everything on subscribe (`reset`), then new and
    * changed items. `title`, `mode` (e.g. "default", "acceptEdits", "plan") and
@@ -132,8 +142,14 @@ export type HostMessage =
       /** Models to offer for switching: `command` is what to type (e.g. "/model opus", "/switch provider/id"). */
       models?: { label: string; command: string }[]
     }
-  /** A terminal pane's visible text. (Web panes open on the device itself, from the URL in the state.) */
+  /** A terminal pane's visible text. */
   | { t: 'screen'; pane: number; text: string; cols: number; rows: number }
+  /**
+   * A web tab as it looks on the Mac, for a device that subscribed `live`: a JPEG
+   * (base64) of the tab's viewport, `w`×`h` CSS pixels. Sent when the page changes; the
+   * next waits for the device's `frame-ack` of this `seq`.
+   */
+  | { t: 'frame'; pane: number; seq: number; data: string; w: number; h: number }
   /**
    * A plain shell pane's commands, for a native view: on subscribe the recent ones
    * (`reset`), then each new or changed block (upserted by id).
@@ -173,8 +189,28 @@ export const UPLOAD_MAX_BYTES = 32 * 1024 * 1024
 export const REMOTE_KEYS = ['enter', 'escape', 'tab', 'backspace', 'up', 'down', 'left', 'right', 'ctrl-c', 'ctrl-d', 'shift-tab'] as const
 export type RemoteKey = (typeof REMOTE_KEYS)[number]
 
+/** What a device can do on a web tab it watches `live`. Points are the frame's CSS pixels. */
+export type WebOp =
+  | { op: 'tap'; x: number; y: number }
+  /** A wheel scroll at a point, in CSS pixels (positive `dy` scrolls down). */
+  | { op: 'scroll'; x: number; y: number; dx: number; dy: number }
+  /** Text into whatever has focus. */
+  | { op: 'type'; text: string }
+  | { op: 'key'; key: RemoteKey }
+  | { op: 'navigate'; url: string }
+  | { op: 'back' }
+  | { op: 'forward' }
+  | { op: 'reload' }
+
 export type ClientMessage =
-  | { t: 'subscribe'; pane: number | null }
+  /**
+   * `live`: a web tab is shown as it is on the Mac (`frame`s), not loaded on the device.
+   * (Only to a Mac whose state lists the `live-web` feature.)
+   */
+  | { t: 'subscribe'; pane: number | null; live?: boolean }
+  | { t: 'frame-ack'; pane: number; seq: number }
+  /** Act on a web tab watched `live`, as the device's user (like `text` and `key`). */
+  | ({ t: 'web'; pane: number } & WebOp)
   /**
    * `typed`: key by key, as at the keyboard (not a paste): agents only run slash commands typed.
    * `files`: ids of finished uploads, dropped on the terminal before the text, as if
