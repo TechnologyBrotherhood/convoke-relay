@@ -24,13 +24,20 @@ import { RelayHost, type PairedClient } from '../protocol/session.ts'
 const NAME = process.env.FAKE_HOST_NAME || 'Test Mac'
 const out = (o: object): void => void process.stdout.write(JSON.stringify(o) + '\n')
 
-let relay: ChildProcess | undefined
+// FAKE_MOVE_RELAY=1: a Mac that has moved relays. It tells each device that connects to
+// move to a second relay it starts, and is there too: {"event":"session","relay":"moved"}.
+
+const relays: ChildProcess[] = []
 async function startRelay(): Promise<string> {
   if (process.env.RELAY_URL) return process.env.RELAY_URL
+  return spawnRelay()
+}
+
+async function spawnRelay(): Promise<string> {
   const port = 19000 + Math.floor(Math.random() * 1000)
   const dir = mkdtempSync(join(tmpdir(), 'fake-host-relay-'))
   execFileSync('go', ['build', '-o', join(dir, 'relay'), '.'], { cwd: join(import.meta.dirname, '..') })
-  relay = spawn(join(dir, 'relay'), ['-addr', `127.0.0.1:${port}`, '-data', dir], { stdio: 'ignore' })
+  relays.push(spawn(join(dir, 'relay'), ['-addr', `127.0.0.1:${port}`, '-data', dir], { stdio: 'ignore' }))
   const url = `http://127.0.0.1:${port}`
   for (let i = 0; i < 100; i++) {
     try {
@@ -120,6 +127,7 @@ async function main(): Promise<void> {
       out({ event: 'session', name: client.name })
       void host.send(conn, state)
       void host.send(conn, approvals)
+      if (moved) void host.send(conn, { t: 'relay-move', relay: moved.url })
     },
     onMessage: (conn, _client, msg) => {
       out({ event: 'message', msg })
@@ -198,6 +206,29 @@ async function main(): Promise<void> {
     onStatus: (s, detail) => out({ event: 'status', status: s, detail })
   })
   host.start()
+  // The relay this Mac moved to: the same Mac (key, devices) there.
+  let moved: { url: string; host: RelayHost } | null = null
+  if (process.env.FAKE_MOVE_RELAY) {
+    const url2 = await spawnRelay()
+    const there: RelayHost = new RelayHost({
+      relay: url2,
+      hostId: await hostIdFor(key.publicKey),
+      hostSecret: 'fake-host-secret-'.padEnd(40, 'x'),
+      hostName: NAME,
+      key,
+      clients: () => clients,
+      onPaired: () => {},
+      onSession: (conn, client) => {
+        if (!client) return
+        out({ event: 'session', name: client.name, relay: 'moved' })
+        void there.send(conn, state)
+      },
+      onMessage: (_conn, _client, msg) => out({ event: 'message', relay: 'moved', msg }),
+      onStatus: () => {}
+    })
+    there.start()
+    moved = { url: url2, host: there }
+  }
   for (let i = 0; i < 100 && !host.connected; i++) await new Promise((r) => setTimeout(r, 50))
   out({ event: 'ready', relay: url, link: pairingLink(host.newPairing(10 * 60_000)) })
   createInterface({ input: process.stdin }).on('line', (line) => {
@@ -207,7 +238,8 @@ async function main(): Promise<void> {
   })
   const quit = (): void => {
     host.stop()
-    relay?.kill()
+    moved?.host.stop()
+    for (const r of relays) r.kill()
     process.exit(0)
   }
   process.on('SIGTERM', quit)
