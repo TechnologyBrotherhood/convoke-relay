@@ -16,7 +16,9 @@ import {
   unb64u,
   hostFingerprint,
   hostIdFor,
-  hostIdMatchesKey
+  hostIdMatchesKey,
+  openPush,
+  sealPush
 } from '../protocol/crypto.ts'
 import { pairingLink, parsePairingLink } from '../protocol/messages.ts'
 
@@ -202,4 +204,21 @@ test('host fingerprints: stable, comparable, and different per key', async () =>
   assert.match(fa, /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/)
   assert.equal(await hostFingerprint(a.publicKey), fa)
   assert.notEqual(await hostFingerprint(b.publicKey), fa)
+})
+
+test('a push alert opens only with its key, unaltered, and its length is padded', async () => {
+  const key = randomBytes(32)
+  const alert = { title: 'Wikipen: Blog post SEO', body: 'Claude needs your permission to use Bash', pane: 271, host: 'h-1' }
+  const sealed = await sealPush(key, alert)
+  assert.deepEqual(await openPush(key, sealed), alert)
+  assert.equal(await openPush(randomBytes(32), sealed), null, 'another key')
+  const bytes = unb64u(sealed)
+  bytes[20] ^= 1
+  assert.equal(await openPush(key, b64u(bytes)), null, 'altered')
+  assert.equal(await openPush(key, 'not-a-push'), null)
+  // Short and longer texts seal to the same size (a multiple of 256, plus nonce and tag).
+  const short = unb64u(await sealPush(key, { title: 'a', body: 'b' })).length
+  assert.equal(short, 12 + 256 + 16)
+  assert.equal(unb64u(await sealPush(key, { title: 'Wikipen', body: 'Claude needs your permission' })).length, short)
+  await assert.rejects(sealPush(randomBytes(16), alert), CryptoError)
 })

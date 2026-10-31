@@ -6,13 +6,16 @@
 // needs the user (an agent asks for approval, a long task finishes) and the phone isn't
 // connected, the Mac posts the id here and this service sends a content-free alert
 // ("Something needs you on your Mac"). The phone opens, connects, and gets the details
-// end to end. So this service knows device tokens and when wake-ups happen, nothing else.
+// end to end. A Mac the phone gave a push key can also send what it's about, sealed with
+// that key (`payload`): it goes to the phone as is, and the phone's notification extension
+// opens it and replaces the alert's text (the fixed alert stays if it can't). So this
+// service knows device tokens and when wake-ups happen, nothing else.
 //
 // It's separate from the relay because anyone can run a relay, but only Convoke has the
 // APNs key for the App Store app.
 //
 //	POST /v1/register {"token":"<hex>","env":"production"|"sandbox"} → {"id":"<push id>"}
-//	POST /v1/push     {"id":"<push id>"}                              → 202 (or 410: gone)
+//	POST /v1/push     {"id":"<push id>","payload":"<sealed, b64u>"?}  → 202 (or 410: gone)
 //	GET  /health
 package push
 
@@ -50,6 +53,13 @@ var apnsHosts = map[string]string{
 const alertBody = "Something needs you on your Mac."
 
 var tokenPattern = regexp.MustCompile(`^[0-9a-fA-F]{64,200}$`)
+
+// A sealed alert (b64u; ciphertext the service can't read), small enough for APNs' 4 KB.
+var payloadPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+func validPayload(p string) bool {
+	return len(p) >= 40 && len(p) <= 2048 && payloadPattern.MatchString(p)
+}
 
 // Config for a Service.
 type Config struct {
@@ -239,10 +249,11 @@ func (s *Service) register(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) push(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ID string `json:"id"`
+		ID      string `json:"id"`
+		Payload string `json:"payload"`
 	}
-	if err := readJSON(r, &req); err != nil || req.ID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "want {id}"})
+	if err := readJSON(r, &req); err != nil || req.ID == "" || (req.Payload != "" && !validPayload(req.Payload)) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "want {id, payload?: b64u}"})
 		return
 	}
 	if s.key == nil {
@@ -267,7 +278,7 @@ func (s *Service) push(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
-	status, err := s.send(r.Context(), reg)
+	status, err := s.send(r.Context(), reg, req.Payload)
 	switch {
 	case status == http.StatusGone || (status == http.StatusBadRequest && errors.Is(err, errBadToken)):
 		// APNs says the token is no longer valid (app removed, or re-registered).
@@ -288,15 +299,20 @@ func (s *Service) push(w http.ResponseWriter, r *http.Request) {
 
 var errBadToken = errors.New("bad device token")
 
-// send posts the content-free alert to APNs for one device.
-func (s *Service) send(ctx context.Context, reg Registration) (int, error) {
-	payload, _ := json.Marshal(map[string]any{
-		"aps": map[string]any{
-			"alert":             map[string]string{"title": "Convoke", "body": alertBody},
-			"sound":             "default",
-			"content-available": 1,
-		},
-	})
+// send posts the content-free alert to APNs for one device, with the Mac's sealed
+// payload (if any) for the phone's notification extension to open.
+func (s *Service) send(ctx context.Context, reg Registration, sealed string) (int, error) {
+	aps := map[string]any{
+		"alert":             map[string]string{"title": "Convoke", "body": alertBody},
+		"sound":             "default",
+		"content-available": 1,
+	}
+	msg := map[string]any{"aps": aps}
+	if sealed != "" {
+		aps["mutable-content"] = 1
+		msg["sealed"] = sealed
+	}
+	payload, _ := json.Marshal(msg)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Hosts[reg.Env]+"/3/device/"+reg.Token, bytes.NewReader(payload))
 	if err != nil {
 		return 0, err

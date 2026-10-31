@@ -377,3 +377,46 @@ export async function sessionHostAccept(
   const channel = await Channel.create(keys.h2c, keys.c2h)
   return { channel, reply: { t: 'hello-ok', he: b64u(he.publicKey), box: await channel.seal(welcome) } }
 }
+
+/**
+ * A push notification's text, end to end. The device gives each Mac a random 32-byte push
+ * key inside their session (`push.key`); the Mac seals what it would say with it, and only
+ * the device can read it (its notification extension rewrites the content-free alert). The
+ * push service and APNs see only the ciphertext, padded to a multiple of 256 bytes.
+ * `b64u(nonce12 || AES-GCM(json, aad "convoke/push/v1"))`.
+ */
+export interface PushAlert {
+  title: string
+  body: string
+  /** The pane it's about, to open when the notification is tapped. */
+  pane?: number
+  /** The Mac it's from (its host id). */
+  host?: string
+}
+
+const PUSH_AAD = enc.encode('convoke/push/v1')
+
+async function pushKey(raw: Bytes): Promise<CryptoKey> {
+  if (raw.length !== 32) throw new CryptoError('a push key is 32 bytes')
+  return subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
+}
+
+export async function sealPush(key: Bytes, alert: PushAlert, iv: Bytes = randomBytes(12)): Promise<string> {
+  const json = JSON.stringify({ title: alert.title.slice(0, 120), body: alert.body.slice(0, 400), ...(alert.pane !== undefined && { pane: alert.pane }), ...(alert.host && { host: alert.host }) })
+  const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: PUSH_AAD }, await pushKey(key), padded(json)))
+  return b64u(concat(iv, ct))
+}
+
+/** The alert in a sealed push, or null if it isn't one sealed with this key. */
+export async function openPush(key: Bytes, sealed: string): Promise<PushAlert | null> {
+  try {
+    const bytes = unb64u(sealed)
+    if (bytes.length < 12 + 16) return null
+    const pt = await subtle.decrypt({ name: 'AES-GCM', iv: bytes.subarray(0, 12), additionalData: PUSH_AAD }, await pushKey(key), bytes.subarray(12))
+    const v = JSON.parse(dec.decode(pt)) as Record<string, unknown>
+    if (typeof v.title !== 'string' || typeof v.body !== 'string') return null
+    return { title: v.title, body: v.body, ...(typeof v.pane === 'number' && { pane: v.pane }), ...(typeof v.host === 'string' && { host: v.host }) }
+  } catch {
+    return null
+  }
+}

@@ -163,6 +163,29 @@ func TestRegisterThenWakeSendsAContentFreeAlert(t *testing.T) {
 	}
 }
 
+func TestASealedPayloadGoesThroughAsIs(t *testing.T) {
+	_, apns, api, _ := setup(t, nil)
+	_, reg := post(t, api, "/v1/register", map[string]string{"token": token, "env": "sandbox"})
+	sealed := strings.Repeat("Ab0_-", 60)
+	if code, _ := post(t, api, "/v1/push", map[string]string{"id": reg["id"], "payload": sealed}); code != http.StatusAccepted {
+		t.Fatalf("push: %d", code)
+	}
+	got := apns.deliveries()
+	if len(got) != 1 {
+		t.Fatalf("deliveries: %+v", got)
+	}
+	b, _ := json.Marshal(got[0].body)
+	want := `{"aps":{"alert":{"body":"Something needs you on your Mac.","title":"Convoke"},"content-available":1,"mutable-content":1,"sound":"default"},"sealed":"` + sealed + `"}`
+	if string(b) != want {
+		t.Fatalf("the fixed alert, marked mutable, with the payload untouched:\n got %s\nwant %s", b, want)
+	}
+	for _, bad := range []string{"short", "not base64!" + strings.Repeat("x", 50), strings.Repeat("a", 3000)} {
+		if code, _ := post(t, api, "/v1/push", map[string]string{"id": reg["id"], "payload": bad}); code != http.StatusBadRequest {
+			t.Fatalf("payload %.12q…: %d, want 400", bad, code)
+		}
+	}
+}
+
 func TestWakeUpsAreRateLimitedPerDevice(t *testing.T) {
 	_, apns, api, now := setup(t, nil)
 	_, reg := post(t, api, "/v1/register", map[string]string{"token": token, "env": "production"})

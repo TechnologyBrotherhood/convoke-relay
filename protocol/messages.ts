@@ -235,10 +235,11 @@ export type ClientMessage =
   | { t: 'ping' }
   /**
    * How to wake this device when it isn't connected: its id at a Convoke push service
-   * (`service`, an https URL). The Mac posts only the id there, and the device shows a
-   * content-free alert. `id: null` stops it.
+   * (`service`, an https URL). The Mac posts the id there; the device shows a content-free
+   * alert, or, with `key` (32 random bytes, b64u, this Mac's own), what it's about: the Mac
+   * seals that with the key (`sealPush`) and only the device can open it. `id: null` stops it.
    */
-  | { t: 'push'; id: string | null; service?: string }
+  | { t: 'push'; id: string | null; service?: string; key?: string }
   /**
    * Change the Mac's layout (answered with a `result` carrying the same `rid`). Made in
    * the background: the Mac's own view doesn't switch. `run` is typed into a new
