@@ -85,6 +85,11 @@ export type ChatItem =
       truncated?: boolean
       /** Unified diff lines ("+", "-", " " prefixes) for file edits. */
       diff?: string[]
+      /**
+       * The agent's own permission checks refused it (not the person): why, in a few words
+       * (e.g. "Auto mode: Create Unsafe Agents"). Devices make this hard to miss.
+       */
+      blocked?: string
     }
   /** End of a turn: "Worked for 2m 3s". */
   | { id: string; k: 'turn'; ms: number }
@@ -141,6 +146,12 @@ export type HostMessage =
       context?: { used: number; limit?: number }
       /** Models to offer for switching: `command` is what to type (e.g. "/model opus", "/switch provider/id"). */
       models?: { label: string; command: string }[]
+      /**
+       * Messages the person sent that wait in the agent's own queue (it takes them between
+       * steps or at its next turn), oldest first. Sent whenever the queue changes; absent
+       * where the agent's queue can't be seen. `unqueue` takes one out.
+       */
+      queued?: string[]
     }
   /** A terminal pane's visible text. */
   | { t: 'screen'; pane: number; text: string; cols: number; rows: number }
@@ -231,6 +242,8 @@ export type ClientMessage =
    */
   | { t: 'upload'; id: string; name: string; size: number; seq: number; data: string; last?: boolean }
   | { t: 'key'; pane: number; key: RemoteKey }
+  /** Take a message (as in the chat's `queued`) out of the agent's queue before it reaches the agent. */
+  | { t: 'unqueue'; pane: number; text: string }
   | { t: 'decide'; id: string; allow: boolean }
   | { t: 'ping' }
   /**
