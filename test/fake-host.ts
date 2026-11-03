@@ -59,6 +59,7 @@ const IMAGE = /\.(png|jpe?g|gif|webp|heic)$/i
 
 const state: HostMessage = {
   t: 'state',
+  broadcast: 'Finish the open tickets',
   host: NAME,
   features: ['live-web'],
   active: { stream: 'convoke', tab: 1 },
@@ -195,6 +196,7 @@ async function main(): Promise<void> {
           void host.send(conn, { t: 'uploaded', id: msg.id, ...(!ok && { error: 'size mismatch' }) })
         }
       }
+      if (msg.t === 'broadcast') void host.send(conn, { t: 'broadcasted', sent: 2, skipped: 1 })
       // A prompt typed into the agent shows up in its transcript a moment later, as with a
       // real agent: images dropped with it as Claude records them ("[Image #1] text").
       if (msg.t === 'text' && msg.submit && msg.pane === CLAUDE) {

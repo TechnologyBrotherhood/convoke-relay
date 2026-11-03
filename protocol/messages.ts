@@ -118,6 +118,8 @@ export type HostMessage =
       role?: DeviceRole
       /** What this Mac can do beyond the base protocol: `live-web` (it sends `frame`s of web tabs). */
       features?: string[]
+      /** The prompt `broadcast` sends to every agent, if one is set on this Mac. */
+      broadcast?: string
     }
   /**
    * An agent pane's conversation: everything on subscribe (`reset`), then new and
@@ -174,6 +176,8 @@ export type HostMessage =
    * (`safeRelay`) and ask before following: a relay sees who talks when, though no content.
    */
   | { t: 'relay-move'; relay: string }
+  /** A `broadcast` was typed into `sent` agents; `skipped` were waiting on a permission prompt it would have answered. */
+  | { t: 'broadcasted'; sent: number; skipped: number }
   /** An `upload` arrived whole and was saved (or why not): `text` can now name it in `files`. */
   | { t: 'uploaded'; id: string; error?: string }
   | { t: 'error'; message: string }
@@ -242,6 +246,8 @@ export type ClientMessage =
    */
   | { t: 'upload'; id: string; name: string; size: number; seq: number; data: string; last?: boolean }
   | { t: 'key'; pane: number; key: RemoteKey }
+  /** Send this Mac's `broadcast` prompt (from `state`) to every agent. */
+  | { t: 'broadcast' }
   /** Take a message (as in the chat's `queued`) out of the agent's queue before it reaches the agent. */
   | { t: 'unqueue'; pane: number; text: string }
   | { t: 'decide'; id: string; allow: boolean }
