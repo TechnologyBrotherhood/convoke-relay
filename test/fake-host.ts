@@ -105,6 +105,11 @@ const chat: ChatItem[] = [
   { id: 'tool3', k: 'tool', tool: 'Bash', title: 'Run the tests', detail: 'npm test', status: 'running' }
 ]
 
+/** The Claude tab's conversation, sent when a device opens it. */
+const claudeChat: HostMessage = { t: 'chat', pane: CLAUDE, items: chat, reset: true, title: 'Fix the relay cache', mode: 'default', working: true,
+          model: 'claude-opus-5-5', context: { used: 124_000, limit: 200_000 },
+          models: [{ label: 'Opus', command: '/model opus' }, { label: 'Sonnet', command: '/model sonnet' }, { label: 'Haiku', command: '/model haiku' }] }
+
 async function main(): Promise<void> {
   const url = await startRelay()
   const clients: PairedClient[] = []
@@ -132,9 +137,7 @@ async function main(): Promise<void> {
     },
     onMessage: (conn, _client, msg) => {
       out({ event: 'message', msg })
-      if (msg.t === 'subscribe' && msg.pane === CLAUDE) void host.send(conn, { t: 'chat', pane: CLAUDE, items: chat, reset: true, title: 'Fix the relay cache', mode: 'default', working: true,
-          model: 'claude-opus-5-5', context: { used: 124_000, limit: 200_000 },
-          models: [{ label: 'Opus', command: '/model opus' }, { label: 'Sonnet', command: '/model sonnet' }, { label: 'Haiku', command: '/model haiku' }] })
+      if (msg.t === 'subscribe' && msg.pane === CLAUDE) void host.send(conn, claudeChat)
       if (msg.t === 'subscribe' && msg.pane === SHELL) {
         void host.send(conn, { t: 'screen', pane: SHELL, text: '➜  convoke git status\nOn branch main\nnothing to commit, working tree clean\n➜  convoke ', cols: 80, rows: 24 })
         void host.send(conn, { t: 'blocks', pane: SHELL, reset: true, items: [
@@ -225,7 +228,10 @@ async function main(): Promise<void> {
         out({ event: 'session', name: client.name, relay: 'moved' })
         void there.send(conn, state)
       },
-      onMessage: (_conn, _client, msg) => out({ event: 'message', relay: 'moved', msg }),
+      onMessage: (conn, _client, msg) => {
+        out({ event: 'message', relay: 'moved', msg })
+        if (msg.t === 'subscribe' && msg.pane === CLAUDE) void there.send(conn, claudeChat)
+      },
       onStatus: () => {}
     })
     there.start()
