@@ -49,6 +49,8 @@ async function spawnRelay(): Promise<string> {
 }
 
 const CLAUDE = 11
+/** An agent tab with a long conversation that takes a moment to arrive. */
+const LONG = 16
 const SHELL = 12
 const WEB = 13
 let nextId = 100
@@ -77,7 +79,22 @@ const state: HostMessage = {
     { id: 'other', name: 'Other one', tabs: [{ id: 4, focused: 14, layout: { dir: 'row', ratio: 0.5, a: { pane: 14 }, b: { pane: 15 } }, panes: [
       { id: 14, kind: 'terminal', title: 'npm run dev', cwd: '/Users/me/code/site' },
       { id: 15, kind: 'terminal', title: 'tail -f server.log', cwd: '/Users/me/code/site' }
-    ] }] }
+    ] }, { id: 5, focused: LONG, panes: [{ id: LONG, kind: 'terminal', title: 'A long conversation', cwd: '/Users/me/code/site', agent: 'claude' }] }] }
+  ]
+}
+
+const longChat: HostMessage = {
+  t: 'chat',
+  pane: LONG,
+  reset: true,
+  working: false,
+  items: [
+    ...Array.from({ length: 299 }, (_, i): ChatItem => ({
+      id: `long-${i}`,
+      k: 'assistant',
+      text: `Message ${i}\n\n${'Some lines of a reply of varying length, to make the heights differ. '.repeat(1 + (i % 7))}`
+    })),
+    { id: 'long-last', k: 'assistant', text: 'The newest message' }
   ]
 }
 
@@ -138,6 +155,9 @@ async function main(): Promise<void> {
     onMessage: (conn, _client, msg) => {
       out({ event: 'message', msg })
       if (msg.t === 'subscribe' && msg.pane === CLAUDE) void host.send(conn, claudeChat)
+      if (msg.t === 'subscribe' && msg.pane === LONG) setTimeout(() => void host.send(conn, longChat), 1500)
+      // Sent to the long tab: the whole chat again, as after a reconnect.
+      if (msg.t === 'text' && msg.pane === LONG) void host.send(conn, longChat)
       if (msg.t === 'subscribe' && msg.pane === SHELL) {
         void host.send(conn, { t: 'screen', pane: SHELL, text: '➜  convoke git status\nOn branch main\nnothing to commit, working tree clean\n➜  convoke ', cols: 80, rows: 24 })
         void host.send(conn, { t: 'blocks', pane: SHELL, reset: true, items: [
