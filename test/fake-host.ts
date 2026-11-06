@@ -157,7 +157,14 @@ async function main(): Promise<void> {
       if (msg.t === 'subscribe' && msg.pane === CLAUDE) void host.send(conn, claudeChat)
       if (msg.t === 'subscribe' && msg.pane === LONG) setTimeout(() => void host.send(conn, longChat), 1500)
       // Sent to the long tab: the whole chat again, as after a reconnect.
-      if (msg.t === 'text' && msg.pane === LONG) void host.send(conn, longChat)
+      if (msg.t === 'text' && msg.pane === LONG && msg.text !== 'flap') void host.send(conn, longChat)
+      // The agent's flag off for a moment, as when a session ends and the next registers.
+      if (msg.t === 'text' && msg.pane === LONG && msg.text === 'flap') {
+        const st = state as Extract<HostMessage, { t: 'state' }>
+        const off = { ...st, streams: st.streams.map((x) => ({ ...x, tabs: x.tabs.map((t) => ({ ...t, panes: t.panes.map((p) => (p.id === LONG ? { ...p, agent: undefined } : p)) })) })) }
+        void host.send(conn, off)
+        setTimeout(() => void host.send(conn, state), 2500)
+      }
       if (msg.t === 'subscribe' && msg.pane === SHELL) {
         void host.send(conn, { t: 'screen', pane: SHELL, text: '➜  convoke git status\nOn branch main\nnothing to commit, working tree clean\n➜  convoke ', cols: 80, rows: 24 })
         void host.send(conn, { t: 'blocks', pane: SHELL, reset: true, items: [
