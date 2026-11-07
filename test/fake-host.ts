@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { generateKeyPair, hostIdFor } from '../protocol/crypto.ts'
-import { pairingLink, type ChatItem, type HostMessage } from '../protocol/messages.ts'
+import { pairingLink, type Approval, type ChatItem, type HostMessage } from '../protocol/messages.ts'
 import { FAKE_FRAME } from './fake-frame.ts'
 import { RelayHost, type PairedClient } from '../protocol/session.ts'
 
@@ -98,9 +98,22 @@ const longChat: HostMessage = {
   ]
 }
 
-const approvals: HostMessage = {
+const approvals: Extract<HostMessage, { t: 'approvals' }> = {
   t: 'approvals',
   items: [{ id: 'ap1', pane: CLAUDE, agent: 'claude', tool: 'Bash', summary: 'Run: npm test', detail: 'npm test', createdAt: Date.now() }]
+}
+
+const question: Approval = {
+  id: 'q1',
+  pane: CLAUDE,
+  agent: 'claude',
+  tool: 'AskUserQuestion',
+  summary: 'Which colour? (and 1 more)',
+  createdAt: Date.now(),
+  questions: [
+    { question: 'Which colour?', header: 'Colour', options: [{ label: 'Red', description: 'Warm' }, { label: 'Blue', description: 'Cool' }] },
+    { question: 'Which extras?', header: 'Extras', multiSelect: true, options: [{ label: 'Nuts' }, { label: 'Cream' }, { label: 'Syrup' }] }
+  ]
 }
 
 const chat: ChatItem[] = [
@@ -227,6 +240,9 @@ async function main(): Promise<void> {
         }
       }
       if (msg.t === 'broadcast') void host.send(conn, { t: 'broadcasted', sent: 2, skipped: 1 })
+      // Being told "ask me": the agent asks a question, until it's answered.
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'ask me') void host.send(conn, { ...approvals, items: [...approvals.items, question] })
+      if (msg.t === 'decide' && msg.id === question.id) void host.send(conn, approvals)
       // A prompt typed into the agent shows up in its transcript a moment later, as with a
       // real agent: images dropped with it as Claude records them ("[Image #1] text").
       if (msg.t === 'text' && msg.submit && msg.pane === CLAUDE) {

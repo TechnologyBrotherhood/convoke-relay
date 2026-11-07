@@ -46,6 +46,17 @@ export interface RemoteStream {
 }
 
 /** A permission request from an agent integration, answerable from any device. */
+/** One of an agent's questions to you (Claude Code's AskUserQuestion). */
+export interface Question {
+  /** The full question: answers are keyed by it. */
+  question: string
+  /** A very short label for it, e.g. "Colour". */
+  header?: string
+  options: { label: string; description?: string }[]
+  /** More than one option can be chosen. */
+  multiSelect?: boolean
+}
+
 export interface Approval {
   id: string
   pane: number
@@ -55,6 +66,11 @@ export interface Approval {
   summary: string
   /** Fuller detail (command, diff preview, …), may be long. */
   detail?: string
+  /**
+   * The agent is asking, not asking for permission: answer with `decide` and `answers`.
+   * Without answers, `allow` hands the question to the agent's terminal; `allow: false` skips it.
+   */
+  questions?: Question[]
   createdAt: number
 }
 
@@ -250,7 +266,11 @@ export type ClientMessage =
   | { t: 'broadcast' }
   /** Take a message (as in the chat's `queued`) out of the agent's queue before it reaches the agent. */
   | { t: 'unqueue'; pane: number; text: string }
-  | { t: 'decide'; id: string; allow: boolean }
+  /**
+   * Answer an approval. For one with `questions`, `answers` maps each `question` to the chosen
+   * option's label, or to text of your own; several choices are joined with ", ".
+   */
+  | { t: 'decide'; id: string; allow: boolean; answers?: Record<string, string> }
   | { t: 'ping' }
   /**
    * How to wake this device when it isn't connected: its id at a Convoke push service
