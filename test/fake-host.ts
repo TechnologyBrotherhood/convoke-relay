@@ -208,6 +208,27 @@ async function main(): Promise<void> {
             stream.tabs.push({ id: tab, focused: pane, panes: [{ id: pane, kind: msg.url ? 'web' : 'terminal', title: msg.url ?? msg.run ?? 'zsh', ...(msg.url && { url: msg.url }) }] })
             result = { stream: stream.id, tab, pane }
           } else result = { error: 'no such stream' }
+        } else if (msg.op === 'background') {
+          const tab = st.streams.flatMap((x) => x.tabs).find((t) => t.id === msg.tab)
+          if (tab) {
+            if (msg.on) tab.background = true
+            else delete tab.background
+            result = {}
+          } else result = { error: 'no such tab' }
+        } else if (msg.op === 'mode') {
+          // As a Claude session started without bypass would: it isn't one of the modes.
+          if (msg.mode === 'bypassPermissions') result = { error: "Bypass permissions isn't available in this session." }
+          else {
+            void host.send(conn, { t: 'chat', pane: msg.pane, items: [], mode: msg.mode })
+            result = {}
+          }
+        } else if (msg.op === 'start-agent') {
+          // The shell becomes the agent's: it says so in the state.
+          const pane = st.streams.flatMap((x) => x.tabs).flatMap((t) => t.panes).find((p) => p.id === msg.pane)
+          if (pane) {
+            pane.agent = msg.agent
+            result = {}
+          } else result = { error: 'no such pane' }
         } else if (msg.op === 'close-tab') {
           for (const x of st.streams) x.tabs = x.tabs.filter((t) => t.id !== msg.tab)
           result = {}

@@ -34,6 +34,8 @@ export interface RemoteTab {
   focused: number
   /** How the tab's panes are split (absent: one pane). */
   layout?: RemoteLayout
+  /** Not important right now (periodic work): shown after the others, in italics; it never notifies. */
+  background?: boolean
 }
 
 /** A tab's splits: a pane, or two halves side by side (`row`) or stacked (`column`). */
@@ -282,7 +284,8 @@ export type ClientMessage =
   /**
    * Change the Mac's layout (answered with a `result` carrying the same `rid`). Made in
    * the background: the Mac's own view doesn't switch. `run` is typed into a new
-   * terminal's shell (e.g. "claude"); `url` makes a web tab.
+   * terminal's shell (e.g. "claude"); `url` makes a web tab. A new terminal opens in the
+   * folder the stream's terminals were last in, unless `cwd` says otherwise.
    */
   | ({ t: 'layout'; rid: string } & (
       | { op: 'new-stream'; name: string }
@@ -290,6 +293,15 @@ export type ClientMessage =
       | { op: 'close-tab'; tab: number }
       /** One split; its tab closes with it only if it was the tab's last. */
       | { op: 'close-pane'; pane: number }
+      /** Make a tab a background tab, or a normal one again. */
+      | { op: 'background'; tab: number; on: boolean }
+      /**
+       * Put the agent in a pane in this permission mode (Claude Code: "default", "acceptEdits",
+       * "plan", "auto", "bypassPermissions"). An error if that session doesn't offer it.
+       */
+      | { op: 'mode'; pane: number; mode: string }
+      /** Start an agent ("claude", "codex", "omp") in a terminal pane's shell, in its folder. */
+      | { op: 'start-agent'; pane: number; agent: string }
     ))
 
 /** What a pairing QR / link carries. */
