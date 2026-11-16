@@ -26,6 +26,8 @@ export interface RemotePane {
   setupAgent?: string
   /** A web tab an agent is acting on right now, and which agent ("Claude", "Codex", …). */
   driving?: string
+  /** The agent here is mid-turn (as the Mac's tab shows it). Absent: not working, or unknown. */
+  working?: boolean
 }
 
 export interface RemoteTab {
