@@ -182,7 +182,22 @@ export type HostMessage =
    * (base64) of the tab's viewport, `w`×`h` CSS pixels. Sent when the page changes; the
    * next waits for the device's `frame-ack` of this `seq`.
    */
-  | { t: 'frame'; pane: number; seq: number; data: string; w: number; h: number }
+  | {
+      t: 'frame'
+      pane: number
+      seq: number
+      data: string
+      w: number
+      h: number
+      /**
+       * Set while the frames are of an extension's window over the tab (its toolbar popup,
+       * or a window it opened, e.g. a password manager asking to use a passkey) rather than
+       * the page: input goes to that window until it closes (`close-surface`).
+       */
+      surface?: { ext: string; title: string }
+    }
+  /** The extensions a live web tab has, whose popup a device can open there (`extension`). */
+  | { t: 'web-extensions'; pane: number; items: { id: string; name: string }[] }
   /**
    * A plain shell pane's commands, for a native view: on subscribe the recent ones
    * (`reset`), then each new or changed block (upserted by id).
@@ -243,6 +258,10 @@ export type WebOp =
   | { op: 'back' }
   | { op: 'forward' }
   | { op: 'reload' }
+  /** Open an extension's toolbar popup on the tab (its frames follow, as a `surface`). */
+  | { op: 'extension'; id: string }
+  /** Close the extension window being shown (back to the page). */
+  | { op: 'close-surface' }
 
 export type ClientMessage =
   /**

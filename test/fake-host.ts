@@ -54,6 +54,8 @@ const LONG = 16
 const SHELL = 12
 const WEB = 13
 let nextId = 100
+/** The fake web tab has its extension's popup open over it. */
+let popupOpen = false
 /** Uploads being received, by id; then what arrived whole (name, size). */
 const uploads = new Map<string, Buffer[]>()
 const uploaded = new Map<string, { name: string; size: number }>()
@@ -190,8 +192,19 @@ async function main(): Promise<void> {
         void host.send(conn, { t: 'blocks', pane: SHELL, items: [{ id: `b${nextId++}`, command: msg.text, startedAt: Date.now(), running: false, exit: 0, ms: 12, output: `ran: ${msg.text}` }] })
       if (msg.t === 'ping') void host.send(conn, { t: 'pong' })
       // The web tab, as on the Mac: a frame on a live subscribe, and after each action.
+      // Its extensions (a password manager), whose popup the device can open over the page:
+      // frames of the popup (a `surface`) until it's closed.
+      if (msg.t === 'subscribe' && msg.pane === WEB && msg.live) {
+        popupOpen = false
+        void host.send(conn, { t: 'web-extensions', pane: WEB, items: [{ id: 'nngceckbapebfimnlniiiahkandclblb', name: 'Bitwarden' }] })
+      }
+      if (msg.t === 'web' && msg.pane === WEB && msg.op === 'extension') popupOpen = true
+      if (msg.t === 'web' && msg.pane === WEB && msg.op === 'close-surface') popupOpen = false
       if ((msg.t === 'subscribe' && msg.pane === WEB && msg.live) || (msg.t === 'web' && msg.pane === WEB))
-        void host.send(conn, { t: 'frame', pane: WEB, seq: nextId++, data: FAKE_FRAME, w: 640, h: 400 })
+        void host.send(conn, {
+          t: 'frame', pane: WEB, seq: nextId++, data: FAKE_FRAME,
+          ...(popupOpen ? { w: 380, h: 600, surface: { ext: 'nngceckbapebfimnlniiiahkandclblb', title: 'Bitwarden' } } : { w: 640, h: 400 })
+        })
       // Layout from the device: change the state, broadcast it, answer with the ids.
       if (msg.t === 'layout') {
         const st = state as Extract<HostMessage, { t: 'state' }>
