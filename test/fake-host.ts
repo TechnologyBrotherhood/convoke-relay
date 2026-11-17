@@ -264,6 +264,12 @@ async function main(): Promise<void> {
       // Being told "ask me": the agent asks a question, until it's answered.
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'ask me') void host.send(conn, { ...approvals, items: [...approvals.items, question] })
       if (msg.t === 'decide' && msg.id === question.id) void host.send(conn, approvals)
+      // Being told "fill context": nearly full (a phone then offers Compact, Recent, Reset).
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'fill context')
+        void host.send(conn, { t: 'chat', pane: CLAUDE, items: [], context: { used: 184_000, limit: 200_000 } })
+      // /clear starts a fresh session, as in Claude Code: the conversation starts over, empty.
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === '/clear')
+        setTimeout(() => void host.send(conn, { t: 'chat', pane: CLAUDE, items: [], reset: true, title: 'Fix the relay cache', mode: 'default', working: false, context: { used: 18_000, limit: 200_000 } }), 500)
       // A prompt typed into the agent shows up in its transcript a moment later, as with a
       // real agent: images dropped with it as Claude records them ("[Image #1] text").
       if (msg.t === 'text' && msg.submit && msg.pane === CLAUDE) {
