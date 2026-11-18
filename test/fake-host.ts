@@ -169,7 +169,8 @@ async function main(): Promise<void> {
     },
     onMessage: (conn, _client, msg) => {
       out({ event: 'message', msg })
-      if (msg.t === 'subscribe' && msg.pane === CLAUDE) void host.send(conn, claudeChat)
+      // FAKE_CHAT_FROM_STDIN: the Claude tab's chat comes from stdin instead (a real transcript replayed).
+      if (msg.t === 'subscribe' && msg.pane === CLAUDE && !process.env.FAKE_CHAT_FROM_STDIN) void host.send(conn, claudeChat)
       if (msg.t === 'subscribe' && msg.pane === LONG) setTimeout(() => void host.send(conn, longChat), 1500)
       // Sent to the long tab: the whole chat again, as after a reconnect.
       if (msg.t === 'text' && msg.pane === LONG && msg.text !== 'flap') void host.send(conn, longChat)
