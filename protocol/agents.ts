@@ -1,10 +1,11 @@
 // What clients say about each agent Convoke integrates with. Unknown agents get their id.
 
-const NAMES: Record<string, string> = { claude: 'Claude', omp: 'oh-my-pi', codex: 'Codex' }
+const NAMES: Record<string, string> = { claude: 'Claude', omp: 'oh-my-pi', codex: 'Codex', agy: 'Antigravity' }
 const COMMANDS: Record<string, { app: string; menu: string; restart: string }> = {
   claude: { app: 'Claude Code', menu: 'Install Claude Integration', restart: '/exit, then claude --continue' },
   omp: { app: 'oh-my-pi', menu: 'Install oh-my-pi Integration', restart: '/exit, then omp --continue' },
-  codex: { app: 'Codex', menu: 'Install Codex Integration', restart: '/quit, then codex resume --last --no-daemon' }
+  codex: { app: 'Codex', menu: 'Install Codex Integration', restart: '/quit, then codex resume --last --no-daemon' },
+  agy: { app: 'Antigravity', menu: 'Install Antigravity Integration', restart: '/quit, then agy --continue' }
 }
 
 /** A short display name, e.g. for a badge or "Message Claude…". */
