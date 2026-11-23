@@ -157,7 +157,7 @@ func TestRegisterThenWakeSendsAContentFreeAlert(t *testing.T) {
 		t.Fatalf("headers: %v", h)
 	}
 	b, _ := json.Marshal(got[0].body)
-	want := `{"aps":{"alert":{"body":"Something needs you on your Mac.","title":"Convoke"},"content-available":1,"sound":"default"}}`
+	want := `{"aps":{"alert":{"body":"Something needs you in Convoke.","title":"Convoke"},"content-available":1,"sound":"default"}}`
 	if string(b) != want {
 		t.Fatalf("payload must be exactly the fixed, content-free alert:\n got %s\nwant %s", b, want)
 	}
@@ -175,7 +175,7 @@ func TestASealedPayloadGoesThroughAsIs(t *testing.T) {
 		t.Fatalf("deliveries: %+v", got)
 	}
 	b, _ := json.Marshal(got[0].body)
-	want := `{"aps":{"alert":{"body":"Something needs you on your Mac.","title":"Convoke"},"content-available":1,"mutable-content":1,"sound":"default"},"sealed":"` + sealed + `"}`
+	want := `{"aps":{"alert":{"body":"Something needs you in Convoke.","title":"Convoke"},"content-available":1,"mutable-content":1,"sound":"default"},"sealed":"` + sealed + `"}`
 	if string(b) != want {
 		t.Fatalf("the fixed alert, marked mutable, with the payload untouched:\n got %s\nwant %s", b, want)
 	}

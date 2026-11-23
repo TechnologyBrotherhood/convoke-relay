@@ -50,7 +50,7 @@ var apnsHosts = map[string]string{
 }
 
 // The one alert every wake-up shows: it says nothing about what happened.
-const alertBody = "Something needs you on your Mac."
+const alertBody = "Something needs you in Convoke."
 
 var tokenPattern = regexp.MustCompile(`^[0-9a-fA-F]{64,200}$`)
 
