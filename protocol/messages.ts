@@ -136,7 +136,11 @@ export type HostMessage =
       streams: RemoteStream[]
       active: { stream: string; tab: number | null }
       role?: DeviceRole
-      /** What this Mac can do beyond the base protocol: `live-web` (it sends `frame`s of web tabs). */
+      /**
+       * What this host can do beyond the base protocol: `live-web` (it sends `frame`s of web
+       * tabs); `server` (it's convoke on a server, convoke-cli, not the Mac app: devices name it
+       * by its host name and give server instructions, e.g. `convoke install claude`).
+       */
       features?: string[]
       /** The prompt `broadcast` sends to every agent, if one is set on this Mac. */
       broadcast?: string
