@@ -22,6 +22,8 @@ import { FAKE_FRAME } from './fake-frame.ts'
 import { RelayHost, type PairedClient } from '../protocol/session.ts'
 
 const NAME = process.env.FAKE_HOST_NAME || 'Test Mac'
+/** Told "fill context" and not compacted or cleared since. */
+let nearlyFull = false
 const out = (o: object): void => void process.stdout.write(JSON.stringify(o) + '\n')
 
 // FAKE_MOVE_RELAY=1: a Mac that has moved relays. It tells each device that connects to
@@ -281,6 +283,13 @@ async function main(): Promise<void> {
       // Being told "fill context": nearly full (a phone then offers Compact, Recent, Reset).
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'fill context')
         void host.send(conn, { t: 'chat', pane: CLAUDE, items: [], context: { used: 184_000, limit: 200_000 } })
+      // /compact, when nearly full: takes a while, then a note and a smaller context.
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'fill context') nearlyFull = true
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === '/clear') nearlyFull = false
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === '/compact' && nearlyFull) {
+        nearlyFull = false
+        setTimeout(() => void host.send(conn, { t: 'chat', pane: CLAUDE, items: [{ id: `n-${Date.now()}`, k: 'note', text: 'Compacted: 184k → 30k tokens' }], context: { used: 30_000, limit: 200_000 } }), 8000)
+      }
       // /clear starts a fresh session, as in Claude Code: the conversation starts over, empty.
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === '/clear')
         setTimeout(() => void host.send(conn, { t: 'chat', pane: CLAUDE, items: [], reset: true, title: 'Fix the relay cache', mode: 'default', working: false, context: { used: 18_000, limit: 200_000 } }), 500)
