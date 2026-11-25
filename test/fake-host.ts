@@ -293,7 +293,7 @@ async function main(): Promise<void> {
         const images = (msg.files ?? []).filter((id) => IMAGE.test(uploaded.get(id)?.name ?? '')).length
         const text = [...Array.from({ length: images }, (_, i) => `[Image #${i + 1}]`), msg.text].filter(Boolean).join(' ')
         // Claude Code tags a large paste (what a phone sends is one).
-        const tagged = text.length > 800 ? `\n\n<pasted_content id="ab12">\n${text}\n</pasted_content id="ab12">\n` : text
+        const tagged = text.length > 200 ? `\n\n<pasted_content id="ab12">\n${text}\n</pasted_content id="ab12">\n` : text
         setTimeout(() => void host.send('all', { t: 'chat', pane: CLAUDE, items: [{ id: `u-${Date.now()}`, k: 'user', text: tagged, ...(images && { images }) }] }), 6000)
       }
     },
