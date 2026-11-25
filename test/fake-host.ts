@@ -292,7 +292,9 @@ async function main(): Promise<void> {
       if (msg.t === 'text' && msg.submit && msg.pane === CLAUDE) {
         const images = (msg.files ?? []).filter((id) => IMAGE.test(uploaded.get(id)?.name ?? '')).length
         const text = [...Array.from({ length: images }, (_, i) => `[Image #${i + 1}]`), msg.text].filter(Boolean).join(' ')
-        setTimeout(() => void host.send('all', { t: 'chat', pane: CLAUDE, items: [{ id: `u-${Date.now()}`, k: 'user', text, ...(images && { images }) }] }), 6000)
+        // Claude Code tags a large paste (what a phone sends is one).
+        const tagged = text.length > 800 ? `\n\n<pasted_content id="ab12">\n${text}\n</pasted_content id="ab12">\n` : text
+        setTimeout(() => void host.send('all', { t: 'chat', pane: CLAUDE, items: [{ id: `u-${Date.now()}`, k: 'user', text: tagged, ...(images && { images }) }] }), 6000)
       }
     },
     onStatus: (s, detail) => out({ event: 'status', status: s, detail })
