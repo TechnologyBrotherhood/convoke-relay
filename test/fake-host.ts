@@ -229,6 +229,17 @@ async function main(): Promise<void> {
             else delete tab.background
             result = {}
           } else result = { error: 'no such tab' }
+        } else if (msg.op === 'settle' || msg.op === 'snooze') {
+          const tab = st.streams.flatMap((x) => x.tabs).find((t) => t.id === msg.tab)
+          if (tab) {
+            if (msg.op === 'settle') {
+              if (msg.on) tab.settled = true
+              else delete tab.settled
+            } else if (msg.until > Date.now()) tab.snoozedUntil = msg.until
+            else delete tab.snoozedUntil
+            if (msg.op === 'settle' && msg.on) for (const p of tab.panes) if (p.attention && p.attention.kind !== 'approval') delete p.attention
+            result = {}
+          } else result = { error: 'no such tab' }
         } else if (msg.op === 'mode') {
           // As a Claude session started without bypass would: it isn't one of the modes.
           if (msg.mode === 'bypassPermissions') result = { error: "Bypass permissions isn't available in this session." }

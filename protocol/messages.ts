@@ -38,6 +38,10 @@ export interface RemoteTab {
   layout?: RemoteLayout
   /** Not important right now (periodic work): shown after the others, in italics; it never notifies. */
   background?: boolean
+  /** Dealt with: its finished/bell marks are cleared and it's shown dimmed, until its agent works again or something in it needs you. */
+  settled?: boolean
+  /** Out of the way (quiet, like settled) until then (ms since the epoch); then it's flagged again. */
+  snoozedUntil?: number
 }
 
 /** A tab's splits: a pane, or two halves side by side (`row`) or stacked (`column`). */
@@ -398,6 +402,10 @@ export type ClientMessage =
       | { op: 'close-pane'; pane: number }
       /** Make a tab a background tab, or a normal one again. */
       | { op: 'background'; tab: number; on: boolean }
+      /** Settle a tab (on), or unsettle it. */
+      | { op: 'settle'; tab: number; on: boolean }
+      /** Snooze a tab until then (ms since the epoch); 0 wakes it now. */
+      | { op: 'snooze'; tab: number; until: number }
       /**
        * Put the agent in a pane in this permission mode (Claude Code: "default", "acceptEdits",
        * "plan", "auto", "bypassPermissions"). An error if that session doesn't offer it.
