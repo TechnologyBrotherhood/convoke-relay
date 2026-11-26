@@ -28,6 +28,8 @@ export interface RemotePane {
   driving?: string
   /** The agent here is mid-turn (as the Mac's tab shows it). Absent: not working, or unknown. */
   working?: boolean
+  /** Ports something in this terminal listens on (a dev server): open them with `http`. */
+  ports?: number[]
 }
 
 export interface RemoteTab {
@@ -244,6 +246,12 @@ export type HostMessage =
    * `html` and `svg` sandboxed, with no network.
    */
   | { t: 'visuals'; pane: number; items: Visual[]; reset?: boolean }
+  /**
+   * The answer to an `http` request, in pieces: the first has `status` and `headers` (or
+   * `error`: nothing listens there, say), each has some of the body (`data`, base64, up to
+   * HTTP_CHUNK_BYTES), the last `last: true`.
+   */
+  | { t: 'http-res'; id: string; status?: number; headers?: Record<string, string>; data?: string; last: boolean; error?: string }
   | { t: 'approvals'; items: Approval[] }
   /**
    * This Mac now uses another relay (its `remote-relay` changed): connect there from now
@@ -356,6 +364,9 @@ export type WebOp =
   /** Close the extension window being shown (back to the page). */
   | { op: 'close-surface' }
 
+/** The most of a response body one `http-res` carries (before base64). */
+export const HTTP_CHUNK_BYTES = 512 * 1024
+
 export type ClientMessage =
   /**
    * `live`: a web tab is shown as it is on the Mac (`frame`s), not loaded on the device.
@@ -387,6 +398,12 @@ export type ClientMessage =
    * file's. The Mac answers the last chunk with `uploaded`.
    */
   | { t: 'upload'; id: string; name: string; size: number; seq: number; data: string; last?: boolean }
+  /**
+   * A request to a port on the computer itself (127.0.0.1: a dev server an agent started),
+   * so the device can open it without a network path to the computer. Answered with
+   * `http-res`. `body`: base64. Full-access devices only.
+   */
+  | { t: 'http'; id: string; port: number; method: string; path: string; headers?: Record<string, string>; body?: string }
   | { t: 'key'; pane: number; key: RemoteKey }
   /** Send this Mac's `broadcast` prompt (from `state`) to every agent. */
   | { t: 'broadcast' }

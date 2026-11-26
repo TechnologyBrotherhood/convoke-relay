@@ -75,7 +75,7 @@ const state: HostMessage = {
       name: 'Convoke',
       tabs: [
         { id: 1, focused: CLAUDE, panes: [{ id: CLAUDE, kind: 'terminal', title: 'Fix the relay cache', cwd: '/Users/me/code/convoke', agent: 'claude', attention: { kind: 'approval', text: 'Needs approval' } }] },
-        { id: 2, focused: SHELL, panes: [{ id: SHELL, kind: 'terminal', title: 'zsh', cwd: '/Users/me/code/convoke' }] },
+        { id: 2, focused: SHELL, panes: [{ id: SHELL, kind: 'terminal', title: 'zsh', cwd: '/Users/me/code/convoke', ports: [5173] }] },
         { id: 3, focused: WEB, panes: [{ id: WEB, kind: 'web', title: 'Example Domain', url: 'https://example.com/', driving: 'Claude' }] }
       ]
     },
@@ -213,6 +213,23 @@ async function main(): Promise<void> {
       if (msg.t === 'text' && msg.pane === SHELL && msg.submit && msg.text)
         void host.send(conn, { t: 'blocks', pane: SHELL, items: [{ id: `b${nextId++}`, command: msg.text, startedAt: Date.now(), running: false, exit: 0, ms: 12, output: `ran: ${msg.text}` }] })
       if (msg.t === 'ping') void host.send(conn, { t: 'pong' })
+      // A dev server on port 5173 (a page, and a script it loads by path); nothing elsewhere.
+      if (msg.t === 'http') {
+        const files: Record<string, [string, string]> = {
+          '/': ['text/html', '<!doctype html><meta name="viewport" content="width=device-width"><h1 id="t">Dev server</h1><script src="/app.js"></script>'],
+          '/app.js': ['text/javascript', 'document.getElementById("t").textContent = "Dev server: script loaded"']
+        }
+        const f = msg.port === 5173 ? files[msg.path.split('?')[0]] : undefined
+        if (msg.port !== 5173) void host.send(conn, { t: 'http-res', id: msg.id, last: true, error: `Nothing is listening on port ${msg.port}.` })
+        else if (!f) void host.send(conn, { t: 'http-res', id: msg.id, status: 404, headers: { 'content-type': 'text/plain' }, data: Buffer.from('not found').toString('base64'), last: true })
+        else {
+          // In two pieces, as a big answer comes.
+          const body = Buffer.from(f[1])
+          const half = Math.floor(body.length / 2)
+          void host.send(conn, { t: 'http-res', id: msg.id, status: 200, headers: { 'content-type': f[0] }, data: body.subarray(0, half).toString('base64'), last: false })
+          void host.send(conn, { t: 'http-res', id: msg.id, data: body.subarray(half).toString('base64'), last: true })
+        }
+      }
       // A message to an agent the device started: the chat shows it, as a real one's would.
       if (msg.t === 'text' && madeAgents.has(msg.pane) && msg.text)
         void host.send(conn, { t: 'chat', pane: msg.pane, items: [{ id: `u${nextId++}`, k: 'user', text: msg.text }] })
