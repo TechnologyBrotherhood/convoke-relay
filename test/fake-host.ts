@@ -108,7 +108,7 @@ const approvals: Extract<HostMessage, { t: 'approvals' }> = {
 }
 
 const CHART_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect x="10" y="40" width="30" height="50" fill="#4a90d9"/><rect x="60" y="20" width="30" height="70" fill="#4a90d9"/><rect x="110" y="60" width="30" height="30" fill="#4a90d9"/><text x="10" y="15" font-size="12">Build times</text></svg>'
-const MOCKUP_HTML = '<!doctype html><html><body style="font-family:-apple-system"><h1 id="h">Sign in</h1><button onclick="document.getElementById(\'h\').textContent=\'Clicked\'">Continue</button><img src="https://example.com/track.png"><script>fetch("https://example.com/leak").then(()=>document.title="leaked").catch(()=>document.title="blocked")</script></body></html>'
+const MOCKUP_HTML = '<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body style="font-family:-apple-system"><h1 id="h">Sign in</h1><button onclick="document.getElementById(\'h\').textContent=\'Clicked\'">Continue</button><p id="net">checking network</p><img src="https://example.com/track.png"><script>fetch("https://example.com/leak").then(()=>{document.getElementById("net").textContent="network reached"}).catch(()=>{document.getElementById("net").textContent="network blocked"})</script></body></html>'
 
 /** A program in the Claude tab asking for a secret (`convoke secret`), sent on "ask secret". */
 const secretAsk: Approval = {
