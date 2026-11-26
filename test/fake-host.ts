@@ -107,6 +107,17 @@ const approvals: Extract<HostMessage, { t: 'approvals' }> = {
   items: [{ id: 'ap1', pane: CLAUDE, agent: 'claude', tool: 'Bash', summary: 'Run: npm test', detail: 'npm test', createdAt: Date.now() }]
 }
 
+/** A program in the Claude tab asking for a secret (`convoke secret`), sent on "ask secret". */
+const secretAsk: Approval = {
+  id: 's1',
+  pane: CLAUDE,
+  agent: 'terminal',
+  tool: 'secret',
+  summary: 'Wants a secret: NPM_TOKEN',
+  secret: { name: 'NPM_TOKEN', why: 'to publish the package' },
+  createdAt: Date.now()
+}
+
 const question: Approval = {
   id: 'q1',
   pane: CLAUDE,
@@ -328,6 +339,8 @@ async function main(): Promise<void> {
       // Being told "ask me": the agent asks a question, until it's answered.
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'ask me') void host.send(conn, { ...approvals, items: [...approvals.items, question] })
       if (msg.t === 'decide' && msg.id === question.id) void host.send(conn, approvals)
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'ask secret') void host.send(conn, { ...approvals, items: [...approvals.items, secretAsk] })
+      if (msg.t === 'decide' && msg.id === secretAsk.id) void host.send(conn, approvals)
       // Being told "fill context": nearly full (a phone then offers Compact, Recent, Reset).
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'fill context')
         void host.send(conn, { t: 'chat', pane: CLAUDE, items: [], context: { used: 184_000, limit: 200_000 } })

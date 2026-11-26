@@ -79,6 +79,12 @@ export interface Approval {
    * Without answers, `allow` hands the question to the agent's terminal; `allow: false` skips it.
    */
   questions?: Question[]
+  /**
+   * A program in the pane asks for a secret (a password, a token): answer with `decide`,
+   * `allow: true` and `answers: { [name]: value }`, from a masked field. The value goes
+   * to that program only (not its terminal); `allow: false` declines.
+   */
+  secret?: { name: string; why?: string }
   createdAt: number
 }
 
