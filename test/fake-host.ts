@@ -107,6 +107,9 @@ const approvals: Extract<HostMessage, { t: 'approvals' }> = {
   items: [{ id: 'ap1', pane: CLAUDE, agent: 'claude', tool: 'Bash', summary: 'Run: npm test', detail: 'npm test', createdAt: Date.now() }]
 }
 
+const CHART_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><rect x="10" y="40" width="30" height="50" fill="#4a90d9"/><rect x="60" y="20" width="30" height="70" fill="#4a90d9"/><rect x="110" y="60" width="30" height="30" fill="#4a90d9"/><text x="10" y="15" font-size="12">Build times</text></svg>'
+const MOCKUP_HTML = '<!doctype html><html><body style="font-family:-apple-system"><h1 id="h">Sign in</h1><button onclick="document.getElementById(\'h\').textContent=\'Clicked\'">Continue</button><img src="https://example.com/track.png"><script>fetch("https://example.com/leak").then(()=>document.title="leaked").catch(()=>document.title="blocked")</script></body></html>'
+
 /** A program in the Claude tab asking for a secret (`convoke secret`), sent on "ask secret". */
 const secretAsk: Approval = {
   id: 's1',
@@ -184,6 +187,11 @@ async function main(): Promise<void> {
       out({ event: 'message', msg })
       // FAKE_CHAT_FROM_STDIN: the Claude tab's chat comes from stdin instead (a real transcript replayed).
       if (msg.t === 'subscribe' && msg.pane === CLAUDE && !process.env.FAKE_CHAT_FROM_STDIN) void host.send(conn, claudeChat)
+      // What the agent showed: a chart (an SVG). "show me" adds a page (HTML, which tries the network).
+      if (msg.t === 'subscribe' && msg.pane === CLAUDE)
+        void host.send(conn, { t: 'visuals', pane: CLAUDE, reset: true, items: [{ id: 'v1', title: 'Build times', type: 'svg', at: Date.now() - 60_000, data: CHART_SVG }] })
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'show me')
+        void host.send(conn, { t: 'visuals', pane: CLAUDE, items: [{ id: `v${nextId++}`, title: 'Mockup', type: 'html', at: Date.now(), data: MOCKUP_HTML }] })
       if (msg.t === 'subscribe' && msg.pane === LONG) setTimeout(() => void host.send(conn, longChat), 1500)
       // Sent to the long tab: the whole chat again, as after a reconnect.
       if (msg.t === 'text' && msg.pane === LONG && msg.text !== 'flap') void host.send(conn, longChat)

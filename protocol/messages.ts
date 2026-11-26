@@ -88,6 +88,17 @@ export interface Approval {
   createdAt: number
 }
 
+/** Something an agent showed (`convoke show FILE`). */
+export interface Visual {
+  id: string
+  title: string
+  /** `html` and `svg`: the text; `png`, `jpeg`, `gif`, `webp`: base64. */
+  type: 'html' | 'svg' | 'png' | 'jpeg' | 'gif' | 'webp'
+  data: string
+  /** When (ms since the epoch). */
+  at: number
+}
+
 /**
  * One entry of an agent's conversation, for the chat view. Items are keyed by `id`:
  * a later item with the same id replaces the earlier one (e.g. a tool call gets its
@@ -227,6 +238,12 @@ export type HostMessage =
    * (`reset`), then each new or changed block (upserted by id).
    */
   | { t: 'blocks'; pane: number; items: ShellBlock[]; reset?: boolean }
+  /**
+   * What an agent showed (`convoke show`): a page, a picture or a diagram, for the chat.
+   * On subscribe the pane's recent ones (`reset`), then each new one. Devices render
+   * `html` and `svg` sandboxed, with no network.
+   */
+  | { t: 'visuals'; pane: number; items: Visual[]; reset?: boolean }
   | { t: 'approvals'; items: Approval[] }
   /**
    * This Mac now uses another relay (its `remote-relay` changed): connect there from now
