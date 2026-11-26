@@ -54,6 +54,8 @@ const LONG = 16
 const SHELL = 12
 const WEB = 13
 let nextId = 100
+/** Panes whose agent a device started (a hand-off): their chats echo what is sent. */
+const madeAgents = new Set<number>()
 /** The fake web tab has its extension's popup open over it. */
 let popupOpen = false
 /** Uploads being received, by id; then what arrived whole (name, size). */
@@ -192,6 +194,9 @@ async function main(): Promise<void> {
       if (msg.t === 'text' && msg.pane === SHELL && msg.submit && msg.text)
         void host.send(conn, { t: 'blocks', pane: SHELL, items: [{ id: `b${nextId++}`, command: msg.text, startedAt: Date.now(), running: false, exit: 0, ms: 12, output: `ran: ${msg.text}` }] })
       if (msg.t === 'ping') void host.send(conn, { t: 'pong' })
+      // A message to an agent the device started: the chat shows it, as a real one's would.
+      if (msg.t === 'text' && madeAgents.has(msg.pane) && msg.text)
+        void host.send(conn, { t: 'chat', pane: msg.pane, items: [{ id: `u${nextId++}`, k: 'user', text: msg.text }] })
       // The web tab, as on the Mac: a frame on a live subscribe, and after each action.
       // Its extensions (a password manager), whose popup the device can open over the page:
       // frames of the popup (a `surface`) until it's closed.
@@ -219,8 +224,19 @@ async function main(): Promise<void> {
           if (stream) {
             const tab = nextId++
             const pane = nextId++
-            stream.tabs.push({ id: tab, focused: pane, panes: [{ id: pane, kind: msg.url ? 'web' : 'terminal', title: msg.url ?? msg.run ?? 'zsh', ...(msg.url && { url: msg.url }) }] })
+            stream.tabs.push({ id: tab, focused: pane, panes: [{ id: pane, kind: msg.url ? 'web' : 'terminal', title: msg.url ?? msg.run ?? 'zsh', ...(msg.url && { url: msg.url }), ...(msg.cwd && { cwd: msg.cwd }) }] })
             result = { stream: stream.id, tab, pane }
+            // An agent started there (a hand-off): it says it's there a moment later, as a real one does.
+            if (msg.run && ['claude', 'codex', 'omp'].includes(msg.run)) {
+              const agent = msg.run
+              setTimeout(() => {
+                const p = st.streams.flatMap((x) => x.tabs).flatMap((t) => t.panes).find((x) => x.id === pane)
+                if (p) p.agent = agent
+                madeAgents.add(pane)
+                void host.send(conn, state)
+                void host.send(conn, { t: 'chat', pane, reset: true, items: [] })
+              }, 800)
+            }
           } else result = { error: 'no such stream' }
         } else if (msg.op === 'background') {
           const tab = st.streams.flatMap((x) => x.tabs).find((t) => t.id === msg.tab)
