@@ -304,6 +304,9 @@ async function main(): Promise<void> {
       // Being told "fill context": nearly full (a phone then offers Compact, Recent, Reset).
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'fill context')
         void host.send(conn, { t: 'chat', pane: CLAUDE, items: [], context: { used: 184_000, limit: 200_000 } })
+      // Being told "finish turn": the turn ends (the chat says it's no longer working).
+      if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'finish turn')
+        setTimeout(() => void host.send(conn, { t: 'chat', pane: CLAUDE, items: [{ id: `t-${Date.now()}`, k: 'turn', ms: 4000 }], working: false }), 1000)
       // /compact takes a while, then a note and a smaller context.
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === '/compact')
         setTimeout(() => void host.send(conn, { t: 'chat', pane: CLAUDE, items: [{ id: `n-${Date.now()}`, k: 'note', text: 'Compacted to 30k tokens' }], context: { used: 30_000, limit: 200_000 } }), 8000)
