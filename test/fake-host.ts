@@ -275,6 +275,29 @@ async function main(): Promise<void> {
         }
       }
       if (msg.t === 'broadcast') void host.send(conn, { t: 'broadcasted', sent: 2, skipped: 1 })
+      if (msg.t === 'usage') {
+        const days = typeof msg.days === 'number' ? msg.days : 30
+        const today = new Date().toISOString().slice(0, 10)
+        void host.send(conn, {
+          t: 'usage',
+          report: {
+            host: NAME,
+            generatedAt: Date.now(),
+            days,
+            totals: { input: 42_000, output: 8_500, cacheRead: 310_000, cacheWrite: 24_000, turns: 19, costUsd: 1.84 },
+            byAgent: {
+              claude: { input: 28_000, output: 6_200, cacheRead: 250_000, cacheWrite: 24_000, turns: 13, costUsd: 1.52 },
+              codex: { input: 14_000, output: 2_300, cacheRead: 60_000, cacheWrite: 0, turns: 6, costUsd: 0.32 }
+            },
+            byModel: [
+              { agent: 'claude', model: 'claude-opus-5-5', input: 28_000, output: 6_200, cacheRead: 250_000, cacheWrite: 24_000, turns: 13, costUsd: 1.52 },
+              { agent: 'codex', model: 'gpt-6.2-sol', input: 14_000, output: 2_300, cacheRead: 60_000, cacheWrite: 0, turns: 6, costUsd: 0.32 }
+            ],
+            byDay: [{ day: today, input: 42_000, output: 8_500, cacheRead: 310_000, cacheWrite: 24_000, turns: 19, costUsd: 1.84 }],
+            limits: [{ agent: 'codex', plan: 'team', windows: [{ label: '7d', usedPercent: 18, resetsAt: Date.now() + 3 * 86_400_000 }], updatedAt: Date.now() }]
+          }
+        })
+      }
       // Being told "ask me": the agent asks a question, until it's answered.
       if (msg.t === 'text' && msg.pane === CLAUDE && msg.text === 'ask me') void host.send(conn, { ...approvals, items: [...approvals.items, question] })
       if (msg.t === 'decide' && msg.id === question.id) void host.send(conn, approvals)

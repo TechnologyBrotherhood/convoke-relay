@@ -227,6 +227,8 @@ export type HostMessage =
   | { t: 'relay-move'; relay: string }
   /** A `broadcast` was typed into `sent` agents; `skipped` were waiting on a permission prompt it would have answered. */
   | { t: 'broadcasted'; sent: number; skipped: number }
+  /** Token usage, estimated API-equivalent cost, and subscription limits from this host (answered to `usage`). */
+  | { t: 'usage'; report: UsageReport }
   /** An `upload` arrived whole and was saved (or why not): `text` can now name it in `files`. */
   | { t: 'uploaded'; id: string; error?: string }
   | { t: 'error'; message: string }
@@ -246,6 +248,56 @@ export interface ShellBlock {
   output: string
   /** Only the end of the output is kept. */
   truncated?: boolean
+}
+
+/** Aggregated token counts and estimated API-equivalent cost (not a subscription bill). */
+export interface UsageTotals {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  turns: number
+  /** Estimated API-equivalent cost in USD; omitted when pricing is unknown. */
+  costUsd?: number
+}
+
+export interface UsageModelRow extends UsageTotals {
+  agent: string
+  model: string
+}
+
+export interface UsageDayRow extends UsageTotals {
+  /** Local date, YYYY-MM-DD. */
+  day: string
+}
+
+export interface UsageLimitWindow {
+  /** Window label, e.g. "5h" or "7d". */
+  label: string
+  /** Percentage of the window consumed, 0–100. */
+  usedPercent: number
+  /** When the window resets (ms since the epoch). */
+  resetsAt?: number
+}
+
+export interface UsageLimit {
+  agent: string
+  plan?: string
+  windows: UsageLimitWindow[]
+  /** When this limit snapshot was last observed (ms since the epoch). */
+  updatedAt?: number
+}
+
+export interface UsageReport {
+  host: string
+  generatedAt: number
+  /** Window requested: 1 (today), 7, 30, or 0 (all history). */
+  days: number
+  totals: UsageTotals
+  byAgent: Record<string, UsageTotals>
+  byModel: UsageModelRow[]
+  byDay: UsageDayRow[]
+  limits: UsageLimit[]
 }
 
 /**
@@ -311,6 +363,8 @@ export type ClientMessage =
   | { t: 'key'; pane: number; key: RemoteKey }
   /** Send this Mac's `broadcast` prompt (from `state`) to every agent. */
   | { t: 'broadcast' }
+  /** Request token usage and rate-limit summary from this host (`days`: 1, 7, 30, or 0 for all). */
+  | { t: 'usage'; days?: number }
   /** Take a message (as in the chat's `queued`) out of the agent's queue before it reaches the agent. */
   | { t: 'unqueue'; pane: number; text: string }
   /**
