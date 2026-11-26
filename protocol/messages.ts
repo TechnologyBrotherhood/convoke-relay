@@ -140,6 +140,8 @@ export type HostMessage =
        * What this host can do beyond the base protocol: `live-web` (it sends `frame`s of web
        * tabs); `server` (it's convoke on a server, convoke-cli, not the Mac app: devices name it
        * by its host name and give server instructions, e.g. `convoke install claude`).
+       * `vt`: it streams terminals as their full state (`vt-watch`, `vt`), for a client
+       * that renders a real terminal (another Mac).
        */
       features?: string[]
       /** The prompt `broadcast` sends to every agent, if one is set on this Mac. */
@@ -181,6 +183,14 @@ export type HostMessage =
     }
   /** A terminal pane's visible text. */
   | { t: 'screen'; pane: number; text: string; cols: number; rows: number }
+  /**
+   * A terminal's whole visible state (`vt` feature), for a pane in the device's `vt-watch`:
+   * `data` is base64 of VT that, written to a cleared terminal `cols`×`rows`, reproduces
+   * the screen: text, colors and styles, cursor, modes (the alternate screen too),
+   * scrolling region, palette, keyboard modes. Sent when it changes; the next for that
+   * pane waits for the device's `vt-ack` of this `seq`.
+   */
+  | { t: 'vt'; pane: number; seq: number; data: string; cols: number; rows: number }
   /**
    * A web tab as it looks on the Mac, for a device that subscribed `live`: a JPEG
    * (base64) of the tab's viewport, `w`×`h` CSS pixels. Sent when the page changes; the
@@ -274,6 +284,16 @@ export type ClientMessage =
    */
   | { t: 'subscribe'; pane: number | null; live?: boolean }
   | { t: 'frame-ack'; pane: number; seq: number }
+  /**
+   * Terminals to stream as `vt` (`vt` feature): this whole set, replacing the last one
+   * (`[]` stops). Independent of `subscribe`, and of any number of panes at once.
+   */
+  | { t: 'vt-watch'; panes: number[] }
+  | { t: 'vt-ack'; pane: number; seq: number }
+  /** Bytes for a watched terminal's input, as the device's own terminal encoded them (base64): every key, kitty keyboard, mouse. */
+  | { t: 'vt-input'; pane: number; data: string }
+  /** The size the device shows a watched terminal at. The host may follow it (when the pane isn't on its own screen) or not. */
+  | { t: 'vt-size'; pane: number; cols: number; rows: number }
   /** Act on a web tab watched `live`, as the device's user (like `text` and `key`). */
   | ({ t: 'web'; pane: number } & WebOp)
   /**
