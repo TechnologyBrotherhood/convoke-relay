@@ -371,7 +371,11 @@ export type ClientMessage =
    * Answer an approval. For one with `questions`, `answers` maps each `question` to the chosen
    * option's label, or to text of your own; several choices are joined with ", ".
    */
-  | { t: 'decide'; id: string; allow: boolean; answers?: Record<string, string> }
+  /**
+   * `files`: finished uploads (`upload`) to go with an answer, by question: the host adds
+   * where they are to that answer, so the agent can open them.
+   */
+  | { t: 'decide'; id: string; allow: boolean; answers?: Record<string, string>; files?: Record<string, string[]> }
   | { t: 'ping' }
   /**
    * How to wake this device when it isn't connected: its id at a Convoke push service
